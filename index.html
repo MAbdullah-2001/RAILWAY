@@ -1,0 +1,3225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PakRail Live Train Tracker</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.5.0/socket.io.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        * {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.3) transparent;
+}
+
+*::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.header {
+  padding: 30px 20px;
+  background: #222;
+  color: white;
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.text-block {
+  flex: 1;
+  text-align: center;
+}
+
+.text-block h1 {
+  margin: 0;
+  font-size: 2.2em;
+}
+
+.text-block p {
+  margin: 6px 0 0;
+  opacity: 0.8;
+}
+
+.cta-button {
+  background: linear-gradient(135deg, #ff6a00, #ee0979);
+  color: white;
+  border: none;
+  padding: 16px 28px;
+  border-radius: 30px;
+  font-size: 1.05em;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  transition: transform 0.2s, box-shadow 0.2s, background 0.3s;
+  flex-shrink: 0;
+}
+
+.cta-button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+}
+
+.cta-button:active {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+
+@media (max-width: 600px) {
+  .header-content {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .cta-button {
+    width: 100%;
+    max-width: 300px;
+  }
+}
+
+*::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 3px;
+}
+
+*::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 3px;
+}
+
+        body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    padding: 20px;
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+        .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 20px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+    min-height: 600px; /* Prevent height jumps */
+}
+.train-details {
+    min-height: 200px;
+    transition: opacity 0.2s ease;
+}
+
+.train-details.updating {
+    opacity: 0.7;
+}
+
+.schedule-timeline {
+    scroll-behavior: auto; /* Disable smooth scroll during updates */
+}
+
+.info-card {
+    min-height: 150px; /* Prevent card height jumps */
+}
+
+select {
+    min-height: 48px; /* Consistent select height */
+}
+
+
+        .header {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .status {
+            padding: 20px;
+            text-align: center;
+            font-size: 1.1em;
+            background: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .status.connecting {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .controls {
+            padding: 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .select-container {
+            margin-bottom: 20px;
+        }
+
+        .select-container label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        select {
+            width: 100%;
+            padding: 12px 16px;
+            font-size: 16px;
+            border: 2px solid #dee2e6;
+            border-radius: 10px;
+            background: white;
+            color: #495057;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #4CAF50;
+            box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+        }
+
+        .update-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+
+        .train-details {
+            padding: 30px;
+            display: none;
+        }
+
+        .train-details.visible {
+            display: block;
+        }
+
+        .train-header {
+            background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+
+        .train-name {
+            font-size: 1.8em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .train-id {
+            font-size: 1em;
+            opacity: 0.9;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .info-card {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .info-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .info-card h3 {
+            color: #495057;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 8px;
+        }
+
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 8px 0;
+        }
+
+        .info-label {
+            font-weight: 600;
+            color: #6c757d;
+        }
+
+        .info-value {
+            font-weight: bold;
+            color: #495057;
+        }
+
+        .speed-value {
+            color: #28a745;
+            font-size: 1.1em;
+        }
+
+        .delay-value {
+            font-size: 1.1em;
+        }
+
+        .delay-on-time {
+            color: #28a745;
+        }
+
+        .delay-late {
+            color: #dc3545;
+        }
+
+        .delay-early {
+            color: #17a2b8;
+        }
+
+        .full-width-card {
+            grid-column: 1 / -1;
+        }
+
+        .maps-link {
+            display: inline-block;
+            background: linear-gradient(135deg, #FF5722 0%, #F44336 100%);
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 25px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-align: center;
+            margin-top: 15px;
+        }
+
+        .maps-link:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(255, 87, 34, 0.3);
+        }
+
+        .station-name {
+            color: #2196F3;
+            font-weight: 600;
+        }
+
+        .route-display {
+            font-size: 1.1em;
+            background: linear-gradient(135deg, #E3F2FD, #BBDEFB);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            margin: 10px 0;
+        }
+
+        .schedule-timeline {
+            max-height: 500px;
+            overflow-y: auto;
+            border-radius: 12px;
+            margin: 15px 0;
+            background: #fff;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+        }
+
+        .schedule-header {
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            color: white;
+            padding: 15px 10px;
+            font-weight: 600;
+            border-radius: 12px 12px 0 0;
+            display: grid;
+            grid-template-columns: 50px 2fr 1fr 1fr 80px;
+            gap: 8px;
+            align-items: center;
+            font-size: 0.85em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .schedule-body {
+            background: #fff;
+        }
+
+        .schedule-item {
+            display: grid;
+            grid-template-columns: 50px 2fr 1fr 1fr 80px;
+            gap: 8px;
+            padding: 12px 10px;
+            border-bottom: 1px solid #e8ecf0;
+            align-items: center;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .schedule-item:last-child {
+            border-bottom: none;
+            border-radius: 0 0 12px 12px;
+        }
+
+        .schedule-item:hover {
+            background: #f8fafc;
+        }
+
+        .schedule-item.current-station {
+            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+            border-left: 4px solid #2196F3;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(33, 150, 243, 0.15);
+        }
+
+        .schedule-item.passed-station {
+            opacity: 0.65;
+            background: #f8f9fa;
+        }
+
+        .schedule-item.passed-station .station-order {
+            background: #28a745;
+        }
+
+        .schedule-item.passed-station::after {
+            content: "✓";
+            position: absolute;
+            right: 20px;
+            color: #28a745;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+
+        .station-order {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 8px;
+            border-radius: 8px;
+            font-size: 0.85em;
+            font-weight: 600;
+            text-align: center;
+            min-width: 40px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .station-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .station-name {
+            font-size: 1em;
+            font-weight: 600;
+            color: #2c3e50;
+            line-height: 1.2;
+        }
+
+        .station-details {
+            font-size: 0.8em;
+            color: #7f8c8d;
+            font-style: italic;
+        }
+
+        .time-cell {
+            text-align: center;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        .scheduled-time {
+            font-weight: 600;
+            color: #2c3e50;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .actual-time {
+            font-size: 0.8em;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-weight: 500;
+            display: inline-block;
+            min-width: 60px;
+        }
+
+        .actual-time.on-time {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .actual-time.delayed {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .actual-time.early {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .status-cell {
+            text-align: center;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+
+        .status-badge {
+            padding: 6px 10px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-next {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .status-passed {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-upcoming {
+            background: #e2e3e5;
+            color: #6c757d;
+            border: 1px solid #d6d8db;
+        }
+
+        .journey-progress-indicator {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: linear-gradient(to bottom, #28a745, #ffc107, #dc3545);
+            opacity: 0.7;
+        }
+
+        /* Train Alert Popups */
+        .train-alert-popup {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 20px 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            min-width: 320px;
+            max-width: 400px;
+            transform: translateX(450px);
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .train-alert-popup.show {
+            transform: translateX(0);
+        }
+
+        .train-alert-popup.approaching {
+            background: linear-gradient(135deg, #ff9800, #f57c00);
+            border-left: 5px solid #ff6f00;
+        }
+
+        .train-alert-popup.reached {
+            background: linear-gradient(135deg, #4caf50, #2e7d32);
+            border-left: 5px solid #1b5e20;
+        }
+
+        .train-alert-popup.departing {
+            background: linear-gradient(135deg, #2196f3, #1565c0);
+            border-left: 5px solid #0d47a1;
+        }
+
+        .alert-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .alert-icon {
+            font-size: 1.8em;
+            animation: bounce 2s infinite;
+        }
+
+        .alert-title {
+            font-size: 1.1em;
+            font-weight: 700;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+        }
+
+        .alert-content {
+            margin-bottom: 15px;
+            line-height: 1.4;
+        }
+
+        .alert-station {
+            font-weight: 600;
+            font-size: 1.05em;
+            margin-bottom: 5px;
+        }
+
+        .alert-time {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .alert-dismiss {
+            position: absolute;
+            top: 8px;
+            right: 12px;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.2em;
+            cursor: pointer;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+
+        .alert-dismiss:hover {
+            opacity: 1;
+        }
+
+        .live-schedule-badge {
+            background: linear-gradient(135deg, #ff4081, #e91e63);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 10px;
+            font-size: 0.75em;
+            font-weight: 600;
+            margin-left: 5px;
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-10px); }
+            60% { transform: translateY(-5px); }
+        }
+
+        @keyframes glow {
+            from { box-shadow: 0 0 5px rgba(255, 64, 129, 0.5); }
+            to { box-shadow: 0 0 15px rgba(255, 64, 129, 0.8); }
+        }
+
+        @media (max-width: 768px) {
+            .train-alert-popup {
+                top: 10px;
+                right: 10px;
+                left: 10px;
+                min-width: auto;
+                max-width: none;
+                transform: translateY(-150px);
+            }
+
+            .train-alert-popup.show {
+                transform: translateY(0);
+            }
+
+            .alert-header {
+                gap: 8px;
+            }
+
+            .alert-icon {
+                font-size: 1.5em;
+            }
+
+            .alert-title {
+                font-size: 1em;
+            }
+        }
+
+        .next-station-card {
+            background: linear-gradient(135deg, #e8f5e8, #c8e6c8);
+            border-left: 4px solid #4caf50;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .station-details-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .station-details-header h3 {
+            margin: 0;
+            border: none;
+            padding: 0;
+        }
+
+        .station-status-badge {
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-moving {
+            background: #e3f2fd;
+            color: #1976d2;
+            border: 1px solid #90caf9;
+        }
+
+        .status-stopped {
+            background: #fff3e0;
+            color: #f57c00;
+            border: 1px solid #ffb74d;
+            animation: pulse-orange 2s infinite;
+        }
+
+        .currently-at-station {
+            background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            border-left: 4px solid #ff9800;
+            position: relative;
+        }
+
+        .currently-at-text {
+            color: #e65100;
+            font-weight: 600;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+
+        .current-station-name {
+            font-size: 1.1em;
+            font-weight: 700;
+            color: #bf360c;
+        }
+
+        .train-reached-animation {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(76, 175, 80, 0.95), rgba(56, 142, 60, 0.95));
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 10;
+            border-radius: 15px;
+            opacity: 0;
+            transform: scale(0.8);
+            transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .train-reached-animation.show {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .reached-icon {
+            font-size: 3em;
+            margin-bottom: 10px;
+            animation: bounceIn 1s ease-out;
+        }
+
+        .reached-text {
+            font-size: 1.2em;
+            font-weight: 700;
+            text-align: center;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+            animation: fadeInUp 1s ease-out 0.3s both;
+        }
+
+        .reached-station-name {
+            font-size: 1.4em;
+            margin-top: 5px;
+            animation: fadeInUp 1s ease-out 0.6s both;
+        }
+
+        @keyframes pulse-orange {
+            0%, 100% { 
+                background: #fff3e0;
+                transform: scale(1);
+            }
+            50% { 
+                background: #ffe0b2;
+                transform: scale(1.02);
+            }
+        }
+
+        @keyframes bounceIn {
+            0% { transform: scale(0) rotate(0deg); }
+            50% { transform: scale(1.2) rotate(180deg); }
+            100% { transform: scale(1) rotate(360deg); }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .coordinates {
+            font-family: 'Courier New', monospace;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-size: 0.9em;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 1.2em;
+            color: #6c757d;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #4CAF50;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px;
+            text-align: center;
+        }
+
+        .eta-badge {
+            background: #4CAF50;
+            color: white;
+            padding: 6px 10px;
+            border-radius: 15px;
+            font-size: 0.75em;
+            font-weight: bold;
+            margin: 2px 0;
+            display: inline-block;
+            min-width: 80px;
+            text-align: center;
+            position: relative;
+        }
+
+        .eta-badge::before {
+            content: "Actual: ";
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .eta-delayed {
+            background: #f44336;
+        }
+
+        .eta-early {
+            background: #2196F3;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 5px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #8BC34A);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        .upcoming-stations {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 10px;
+            margin-top: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #e0e0e0;
+        }
+
+        .upcoming-station-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 8px;
+            font-size: 0.9em;
+            border-bottom: 1px solid #e0e0e0;
+            transition: background-color 0.2s ease;
+        }
+
+        .upcoming-station-item:hover {
+            background-color: #f0f0f0;
+        }
+
+        .upcoming-station-item:last-child {
+            border-bottom: none;
+        }
+
+        .upcoming-station-item.current-next {
+            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+            font-weight: bold;
+            border-left: 3px solid #2196F3;
+        }
+
+        .journey-card {
+            background: linear-gradient(135deg, #f3e5f5, #e1bee7);
+            border-left: 4px solid #9c27b0;
+        }
+
+        .next-station-time {
+            font-size: 1.4em;
+            color: #9c27b0;
+            font-weight: bold;
+            text-align: center;
+            padding: 10px;
+            background: rgba(156, 39, 176, 0.1);
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+
+        .retry-button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px 5px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .retry-button:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+
+        .running-status {
+            font-size: 1.1em;
+            font-weight: bold;
+            padding: 8px 12px;
+            border-radius: 8px;
+            display: inline-block;
+        }
+
+        .status-on-time {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-late {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-early {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        @media (max-width: 768px) {
+    body {
+        padding: 10px;
+        padding-left: max(10px, env(safe-area-inset-left));
+        padding-right: max(10px, env(safe-area-inset-right));
+        min-height: 100vh;
+        overflow-x: hidden;
+    }
+    
+    .container {
+        margin: 0;
+        border-radius: 15px;
+        width: 100%;
+        max-width: 100%;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+    }
+    
+    .header {
+        padding: 20px 15px;
+    }
+    
+    .header h1 {
+        font-size: 2em;
+    }
+    
+    .controls {
+        padding: 20px 15px;
+    }
+    
+    .train-details {
+        padding: 20px 15px;
+    }
+    
+    .info-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+        padding: 0 5px;
+    }
+    
+    .info-card {
+        margin: 0;
+        padding: 15px;
+        border-radius: 12px;
+    }
+    
+    .train-selection-card {
+        padding: 15px !important;
+        margin-bottom: 15px;
+    }
+    
+    .train-selection-grid {
+        gap: 12px !important;
+        padding: 0 5px;
+    }
+    
+    .instance-badge {
+        position: relative !important;
+        display: inline-block !important;
+        margin-bottom: 10px !important;
+        top: auto !important;
+        right: auto !important;
+    }
+    
+    .schedule-timeline {
+        max-height: 400px;
+        margin: 10px -5px;
+    }
+    
+    .schedule-header,
+    .schedule-item {
+        padding-left: 5px;
+        padding-right: 5px;
+        grid-template-columns: 40px 2fr 70px 70px 60px;
+        gap: 4px;
+        padding: 10px 8px;
+        font-size: 0.7em;
+    }
+    
+    .station-name {
+        font-size: 0.85em;
+        line-height: 1.1;
+    }
+    
+    .station-details {
+        display: none;
+    }
+    
+    .time-cell {
+        font-size: 0.75em;
+    }
+    
+    .scheduled-time {
+        font-size: 0.7em;
+        margin-bottom: 2px;
+    }
+    
+    .actual-time {
+        font-size: 0.65em;
+        padding: 2px 4px;
+        min-width: 40px;
+    }
+    
+    .status-badge {
+        font-size: 0.65em;
+        padding: 3px 4px;
+    }
+    
+    .station-order {
+        padding: 4px;
+        font-size: 0.75em;
+        min-width: 30px;
+    }
+    
+    .retry-button {
+        width: 100%;
+        margin: 10px 0;
+    }
+    
+    .maps-link {
+        width: 100%;
+        display: block;
+        text-align: center;
+    }
+    
+    .update-info {
+        flex-direction: column;
+        text-align: center;
+    }
+}
+
+@media (max-width: 375px) {
+    .header h1 {
+        font-size: 1.5em;
+    }
+    
+    .container {
+        border-radius: 10px;
+    }
+    
+    .info-card h3 {
+        font-size: 1em;
+    }
+    
+    .schedule-header,
+    .schedule-item {
+        font-size: 0.7em;
+        grid-template-columns: 30px 1.5fr 60px 60px 50px;
+    }
+}
+
+/* Landscape mobile adjustments */
+@media (max-width: 768px) and (orientation: landscape) {
+    body {
+        padding: 5px;
+        padding-left: max(20px, env(safe-area-inset-left));
+        padding-right: max(20px, env(safe-area-inset-right));
+    }
+    
+    .header {
+        padding: 15px;
+    }
+    
+    .header h1 {
+        font-size: 1.8em;
+    }
+}
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+<div class="header">
+  <div class="header-content">
+    <div class="text-block">
+      <h1>🚂 Pakistan Railways Live Tracker</h1>
+      <p>Real-time Pakistan Railway Train Tracking Made By Fan ABDULLAH</p>
+    </div>
+    <button class="cta-button" onclick="window.location.href='map.html'">🗺️ View Live Trains on Map</button>
+  </div>
+</div>
+        <div id="status" class="status connecting">
+            <div class="spinner"></div>
+            Initializing secure connection...
+        </div>
+
+        <div class="controls">
+            <div class="select-container">
+                <label for="trainSelect">Select Train:</label>
+                <select id="trainSelect" disabled>
+                    <option value="">Loading trains...</option>
+                </select>
+            </div>
+            
+            <div class="update-info">
+                <span id="trainCount">Loading train data...</span>
+                <span id="stationCount">Loading stations...</span>
+                <span id="scheduleCount">Loading schedules...</span>
+                <span id="lastUpdate">Last updated: Never</span>
+                <span id="nextUpdate">Next update in: 30s</span>
+            </div>
+        </div>
+
+        
+
+        <div id="trainDetails" class="train-details">
+            <div class="loading">
+                <div class="spinner"></div>
+                Select a train to view complete tracking details
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class PakRailWebTracker {
+            constructor() {
+            this.config = null;
+            this.socket = null;
+            this.isConnected = false;
+            this.liveTrains = {};
+            this.trainNames = {};
+            this.stationNames = {};
+            this.trainSchedules = {};
+            this.selectedTrainId = null;
+            this.updateInterval = null;
+            this.countdownInterval = null;
+            this.countdown = 30;
+            this.connectionAttempts = 0;
+            this.maxConnectionAttempts = 3;
+            this.currentAlert = null;
+            this.lastAlertType = null;
+            this.lastTrainState = null;
+            this.stationApproachThreshold = 5;
+            this.stationReachedThreshold = 0.5;
+            this.approachingSpeedThreshold = 50;
+            this.trainStateHistory = [];
+            this.stoppedAtStationSince = null;
+            this.currentStationStop = null;
+            this.trainReachedAnimationTimeout = null;
+            this.scheduleScrollPosition = 0;
+            this.isUpdatingDisplay = false;
+            this.alertDebounceTimer = null;
+            this.reachedAlertTimer = null;
+            this.lastReachedStation = null;
+            this.init();
+        }
+
+        async init() {
+            this.setupEventListeners();
+            this.updateStatus('Loading configuration...', 'connecting');
+            
+            await this.loadConfig();
+            
+            if (!this.config) {
+                this.updateStatus('❌ Failed to load configuration', 'error');
+                return;
+            }
+
+            this.updateStatus('Loading trains and stations from API...', 'connecting');
+            
+            const [trainsLoaded, stationsLoaded] = await Promise.all([
+                this.loadTrainNames(),
+                this.loadStationNames()
+            ]);
+            
+            console.log(`📊 Initial Data Loading:
+                • Trains: ${trainsLoaded ? '✅ SUCCESS' : '❌ FAILED'}
+                • Stations: ${stationsLoaded ? '✅ SUCCESS' : '❌ FAILED'} 
+                • Schedules: 🔄 Load on-demand when train selected`);
+            
+            if (!trainsLoaded) {
+                this.updateStatus('⚠️ Train data unavailable - connecting to live tracking...', 'connecting');
+            } else if (!stationsLoaded) {
+                this.updateStatus('⚠️ Station API failed - using schedule data for station names...', 'connecting');
+            } else {
+                this.updateStatus('✅ Train and station data loaded - connecting to live tracking...', 'connecting');
+            }
+            
+            await this.connectWithFallback();
+            this.startPeriodicUpdates();
+        }
+
+        async loadConfig() {
+            try {
+                const response = await fetch('/api/getConfig');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                this.config = await response.json();
+                console.log('✅ Configuration loaded');
+            } catch (error) {
+                console.error('❌ Failed to load config:', error);
+                this.config = null;
+            }
+        }
+
+            setupEventListeners() {
+                const trainSelect = document.getElementById('trainSelect');
+                trainSelect.addEventListener('change', async (e) => {
+                    const selectedValue = e.target.value;
+                    
+                    if (selectedValue) {
+                        if (selectedValue.startsWith('MULTIPLE:')) {
+                            const trainKey = selectedValue.replace('MULTIPLE:', '');
+                            
+                            const matchingTrains = Object.values(this.liveTrains).filter(train => {
+                                const direction = train.isUp ? 'UP' : 'DOWN';
+                                const key = `${train.trainNumber} - ${train.trainName} (${direction})`;
+                                return key === trainKey;
+                            });
+                            
+                            console.log(`🚂 MULTIPLE TRAINS DETECTED: ${matchingTrains.length} trains found for "${trainKey}"`);
+                            this.showTrainSelectionDialog(matchingTrains);
+                            return;
+                        }
+                        
+                        this.selectedTrainId = selectedValue;
+                        await this.loadAndDisplayTrain(selectedValue);
+                    } else {
+                        const detailsEl = document.getElementById('trainDetails');
+                        detailsEl.innerHTML = `
+                            <div class="loading">
+                                <div class="spinner"></div>
+                                Select a train to view complete tracking details
+                            </div>
+                        `;
+                        detailsEl.classList.remove('visible');
+                    }
+                });
+            }
+
+            async connectWithFallback() {
+                this.connectionAttempts++;
+                
+                const socketUrl = this.config.socketUrl;
+                const isUsingProxy = window.location.protocol === 'https:' && socketUrl.includes('workers.dev');
+                
+                this.updateStatus(`🔄 Connection attempt ${this.connectionAttempts}: ${isUsingProxy ? 'Worker Proxy' : 'Direct'}`, 'connecting');
+                
+                try {
+                    await this.connect(socketUrl);
+                } catch (error) {
+                    console.log(`❌ Connection attempt ${this.connectionAttempts} failed:`, error);
+                    
+                    if (this.connectionAttempts < this.maxConnectionAttempts) {
+                        setTimeout(() => this.connectWithFallback(), 3000);
+                        return;
+                    }
+                    
+                    if (isUsingProxy) {
+                        this.updateStatus('❌ Connection failed. Please check your internet connection and try again.', 'error');
+                    } else {
+                        this.updateStatus('❌ Direct connection failed. Deploy Cloudflare Worker proxy for HTTPS.', 'error');
+                    }
+                }
+            }
+
+            async connect(socketUrl = null) {
+                const urlToUse = socketUrl || this.config.socketUrl;
+                
+                return new Promise((resolve, reject) => {
+                    try {
+                        const timestamp = Math.floor(Date.now() / 1000);
+                        const appSignature = "android_app_signature_trackmytrain";
+                        const hmacInput = appSignature + this.config.FB_SEP_KEY + timestamp;
+                        const hmacSignature = this.generateHMACSignature(hmacInput, this.config.FB_SEC_KEY);
+                        
+                        const headers = {
+                            'x-app-signature': appSignature,
+                            'x-timestamp': timestamp.toString(),
+                            'x-hmac': hmacSignature,
+                            [this.config.FB_SOCKET_KEY]: this.config.FB_SOCKET_VAL,
+                            'jungle': 'gaali'
+                        };
+
+                        this.socket = io(urlToUse, {
+                            transports: ['websocket', 'polling'],
+                            timeout: 10000,
+                            forceNew: true,
+                            extraHeaders: headers
+                        });
+
+                        this.socket.on('connect', () => {
+                            console.log('✅ Connected to PakRail Live Socket');
+                            this.isConnected = true;
+                            this.updateStatus('🎉 Live tracking active! Loading train data...', 'connected');
+                            this.requestLiveTrains();
+                            resolve();
+                        });
+
+                        this.socket.on('track-all', (data) => {
+                            this.processLiveTrainsData(data);
+
+                            this.updateTrainSelect();
+// Only update display if not already updating
+if (!this.isUpdatingDisplay && this.selectedTrainId) {
+    this.smoothUpdate(() => this.displaySelectedTrain());
+}
+                            this.displaySelectedTrain();
+                        });
+
+                        this.socket.on('connect_error', (error) => {
+                            console.log('❌ Socket connection error:', error);
+                            reject(error);
+                        });
+
+                        this.socket.on('disconnect', (reason) => {
+                            console.log('🔌 Socket disconnected:', reason);
+                            this.isConnected = false;
+                            this.updateStatus('🔌 Disconnected. Reconnecting...', 'error');
+                        });
+
+                        setTimeout(() => {
+                            if (!this.isConnected) {
+                                reject(new Error('Connection timeout'));
+                            }
+                        }, 15000);
+
+                    } catch (error) {
+                        reject(error);
+                    }
+                });
+            }
+
+           showTrainSelectionDialog(trains) {
+    const detailsEl = document.getElementById('trainDetails');
+    
+    const trainName = trains[0].trainName;
+    const direction = trains[0].isUp ? 'UP' : 'DOWN';
+    
+    detailsEl.innerHTML = `
+        <div style="background: linear-gradient(135deg, #fff3e0, #ffe0b2); 
+                    padding: 20px; 
+                    border-radius: 15px; 
+                    border-left: 4px solid #ff9800;
+                    margin: 10px;">
+            <h3 style="color: #e65100; 
+                       margin-bottom: 15px; 
+                       text-align: center;
+                       font-size: 1.2em;">
+                🚂 Multiple ${trainName} (${direction}) Trains Found!
+            </h3>
+            <p style="text-align: center; 
+                      margin-bottom: 20px; 
+                      color: #bf360c; 
+                      font-weight: 600;
+                      font-size: 0.95em;
+                      padding: 0 10px;">
+                Found ${trains.length} active ${trainName} ${direction} trains. Please select which specific train to track:
+            </p>
+            <div class="train-selection-grid" style="display: flex; 
+                                                     flex-direction: column; 
+                                                     gap: 15px;
+                                                     max-height: 60vh;
+                                                     overflow-y: auto;
+                                                     padding: 5px;">
+                ${trains.map((train, index) => {
+                    const nextStationName = this.getStationName(train.nextStation);
+                    const delay = this.formatDelay(train.delay);
+                    const lastUpdate = new Date(train.lastUpdatedTime).toLocaleTimeString();
+                    
+                    return `
+                        <div onclick="tracker.selectSpecificTrain('${train.uniqueId}')" 
+                             class="train-selection-card"
+                             style="background: white; 
+                                    padding: 20px; 
+                                    border-radius: 10px; 
+                                    cursor: pointer; 
+                                    border: 2px solid #ddd; 
+                                    transition: all 0.3s ease; 
+                                    position: relative;
+                                    display: block;
+                                    width: 100%;
+                                    box-sizing: border-box;"
+                             onmouseover="this.style.borderColor='#ff9800'; this.style.transform='translateY(-2px)'"
+                             onmouseout="this.style.borderColor='#ddd'; this.style.transform='translateY(0)'">
+                            
+                            <div class="instance-badge" 
+                                 style="background: #e3f2fd; 
+                                        color: #1976d2; 
+                                        padding: 4px 8px; 
+                                        border-radius: 12px; 
+                                        font-size: 0.8em; 
+                                        font-weight: bold;
+                                        display: inline-block;
+                                        margin-bottom: 10px;">
+                                Instance ${index + 1}
+                            </div>
+                            
+                            <div style="margin-bottom: 15px;">
+                                <strong style="color: #e65100; 
+                                               font-size: 1.1em;
+                                               display: block;
+                                               margin-bottom: 5px;">
+                                    ${train.trainName} (${direction})
+                                </strong>
+                                <div style="color: #666; 
+                                            margin-top: 5px; 
+                                            font-family: 'Courier New', monospace;
+                                            font-size: 0.8em;
+                                            word-break: break-all;">
+                                    🆔 ID: ${train.trainId} | 🚂 #${train.trainNumber}
+                                </div>
+                            </div>
+                            
+                            <div style="display: grid; 
+                                        grid-template-columns: 1fr; 
+                                        gap: 10px; 
+                                        margin-bottom: 15px;">
+                                <div style="display: flex; justify-content: space-between;">
+                                    <div>
+                                        <div style="font-size: 0.85em; color: #666;">🚉 Next Station:</div>
+                                        <div style="color: #2196F3; font-weight: 600; font-size: 0.9em;">
+                                            ${nextStationName}
+                                        </div>
+                                    </div>
+                                    <div style="text-align: right;">
+                                        <div style="font-size: 0.85em; color: #666;">⚡ Speed:</div>
+                                        <div style="color: #4caf50; font-weight: bold;">
+                                            ${train.speed} km/h
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div style="display: flex; 
+                                        justify-content: space-between; 
+                                        align-items: center; 
+                                        background: #f8f9fa; 
+                                        padding: 10px; 
+                                        border-radius: 8px;
+                                        flex-wrap: wrap;
+                                        gap: 10px;">
+                                <div>
+                                    <span style="color: #666; font-size: 0.85em;">Status:</span>
+                                    <span class="delay-value ${delay.class}" 
+                                          style="font-weight: bold; 
+                                                 margin-left: 5px;
+                                                 font-size: 0.9em;">
+                                        ${delay.text}
+                                    </span>
+                                </div>
+                                <div style="text-align: right;">
+                                    <div style="color: #666; font-size: 0.75em;">Last Update:</div>
+                                    <div style="font-size: 0.8em; 
+                                                font-family: 'Courier New', monospace;">
+                                        ${lastUpdate}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+            <div style="text-align: center; 
+                        margin-top: 20px;
+                        padding: 0 10px;">
+                <button onclick="tracker.cancelTrainSelection()" 
+                        class="retry-button" 
+                        style="background: #666;
+                               width: 100%;
+                               max-width: 300px;">
+                    Cancel Selection
+                </button>
+            </div>
+        </div>
+    `;
+    
+    detailsEl.classList.add('visible');
+}
+
+            async selectSpecificTrain(uniqueTrainId) {
+    console.log(`🎯 SELECTING SPECIFIC TRAIN: ${uniqueTrainId}`);
+    
+    if (!this.liveTrains[uniqueTrainId]) {
+        console.error(`❌ Train ${uniqueTrainId} not found in liveTrains!`);
+        return;
+    }
+    
+    // Reset all train state tracking when switching trains
+    this.lastTrainState = null;
+    this.lastReachedStation = null;
+    this.stoppedAtStationSince = null;
+    this.currentStationStop = null;
+    this.trainStateHistory = [];
+    this.dismissAlert(); // Dismiss any existing alerts
+    
+    this.selectedTrainId = uniqueTrainId;
+    
+    const trainSelect = document.getElementById('trainSelect');
+    trainSelect.value = uniqueTrainId;
+    
+    console.log(`✅ Selected train ${uniqueTrainId}, loading details...`);
+    await this.loadAndDisplayTrain(uniqueTrainId);
+}
+
+            cancelTrainSelection() {
+                const trainSelect = document.getElementById('trainSelect');
+                trainSelect.value = '';
+                this.selectedTrainId = null;
+                
+                const detailsEl = document.getElementById('trainDetails');
+                detailsEl.innerHTML = `
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        Select a train to view complete tracking details
+                    </div>
+                `;
+                detailsEl.classList.remove('visible');
+            }
+
+            async loadAndDisplayTrain(uniqueTrainId) {
+                console.log(`🚂 LOADING TRAIN: ${uniqueTrainId}`);
+
+                this.lastTrainState = null;
+                this.lastReachedStation = null;
+                this.stoppedAtStationSince = null;
+                this.currentStationStop = null;
+                this.trainStateHistory = [];
+                this.dismissAlert();
+                
+                if (!this.liveTrains[uniqueTrainId]) {
+                    console.error(`❌ Train ${uniqueTrainId} not found!`);
+                    return;
+                }
+                
+                const detailsEl = document.getElementById('trainDetails');
+                detailsEl.innerHTML = `
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        Loading complete schedule for Train ${uniqueTrainId}...
+                    </div>
+                `;
+                detailsEl.classList.add('visible');
+                
+                const originalTrainId = uniqueTrainId.includes('-') ? uniqueTrainId.split('-')[0] : uniqueTrainId;
+                
+                console.log(`📅 FORCING schedule load for train ${originalTrainId} (unique: ${uniqueTrainId})...`);
+                const scheduleLoaded = await this.loadSpecificTrainSchedule(originalTrainId);
+                console.log(`📅 Schedule result for train ${originalTrainId}: ${scheduleLoaded ? '✅ SUCCESS' : '❌ FAILED'}`);
+                
+                if (scheduleLoaded) {
+                    console.log(`📋 Schedule data available for train ${originalTrainId}:`, this.trainSchedules[originalTrainId] ? this.trainSchedules[originalTrainId].length : 0, 'stations');
+                    
+                    if (this.liveTrains[uniqueTrainId]) {
+                        this.liveTrains[uniqueTrainId].scheduleData = this.trainSchedules[originalTrainId];
+                        console.log(`🔄 UPDATED live train ${uniqueTrainId} with fresh schedule data`);
+                    }
+                }
+                
+                const totalSchedules = Object.keys(this.trainSchedules).length;
+                document.getElementById('scheduleCount').textContent = `${totalSchedules} schedules loaded`;
+                
+                console.log(`🎯 DISPLAYING train ${uniqueTrainId} with loaded schedule...`);
+                this.displaySelectedTrain();
+            }
+
+            updateStatus(message, type = 'connecting') {
+                const statusEl = document.getElementById('status');
+                statusEl.className = `status ${type}`;
+                statusEl.innerHTML = type === 'connecting' ? 
+                    `<div class="spinner"></div>${message}` : message;
+            }
+
+            async loadTrainNames() {
+                console.log('🚂 Loading train names from Train/GetLiveTrains...');
+                
+                try {
+                    const response = await fetch(`${this.config.apiBase}Train/GetLiveTrains`, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+
+                    const data = await response.json();
+                    
+                    if (data && data.Response && Array.isArray(data.Response)) {
+                        data.Response.forEach(train => {
+                            this.trainNames[train.TrainId.toString()] = {
+                                id: train.TrainId,
+                                number: train.TrainNumber,
+                                name: train.TrainName,
+                                nameUR: train.TrainNameUR,
+                                nameWithNumber: train.TrainNameWithNumber,
+                                description: train.TrainDescription,
+                                isLive: train.IsLive,
+                                isUp: train.IsUp,
+                                imei: train.Imei
+                            };
+                        });
+                        
+                        console.log(`✅ Loaded ${data.Response.length} train names`);
+                        return true;
+                    } else {
+                        console.log('⚠️ No train data in response:', data);
+                        return false;
+                    }
+                } catch (error) {
+                    console.log('❌ Failed to load train names:', error.message);
+                    return false;
+                }
+            }
+
+            async loadStationNames() {
+                console.log('🚉 Loading station names from Station/GetStations...');
+                
+                try {
+                    const response = await fetch(`${this.config.apiBase}Station/GetStations`, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+
+                    const data = await response.json();
+                    
+                    if (data && data.Response && Array.isArray(data.Response)) {
+                        this.stationNames = {};
+                        
+                        data.Response.forEach((station, index) => {
+                            try {
+                                const stationId = station.StationDetailsId;
+                                const stationName = station.StationName;
+                                const stationNameUR = station.StationNameUR;
+                                const city = station.City;
+                                const latitude = station.Latitude;
+                                const longitude = station.Longitude;
+                                
+                                if (stationId && stationName) {
+                                    this.stationNames[stationId.toString()] = {
+                                        id: stationId,
+                                        name: stationName.trim(),
+                                        nameUR: stationNameUR ? stationNameUR.trim() : '',
+                                        city: city ? city.trim() : '',
+                                        latitude: latitude,
+                                        longitude: longitude
+                                    };
+                                }
+                            } catch (stationError) {
+                                console.log(`❌ Error processing station ${index}:`, stationError);
+                            }
+                        });
+                        
+                        const stationCount = Object.keys(this.stationNames).length;
+                        console.log(`✅ STATIONS LOADED: ${stationCount}/${data.Response.length} stations from API`);
+                        document.getElementById('stationCount').textContent = `${stationCount} stations loaded`;
+                        return stationCount > 0;
+                    } else {
+                        console.log('❌ Invalid API response structure:', data);
+                        return false;
+                    }
+                } catch (error) {
+                    console.log('❌ Station API failed:', error.message);
+                    document.getElementById('stationCount').textContent = `Station API failed`;
+                    return false;
+                }
+            }
+
+            async loadSpecificTrainSchedule(trainId) {
+                try {
+                    console.log(`📅 Fetching schedule from API: Train/GetTrainStationsByTrainId?id=${trainId}`);
+                    const response = await fetch(`${this.config.apiBase}Train/GetTrainStationsByTrainId?id=${trainId}`, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (!response.ok) {
+                        console.log(`❌ Schedule API failed for train ${trainId}: HTTP ${response.status} ${response.statusText}`);
+                        return false;
+                    }
+
+                    const data = await response.json();
+                    
+                    if (data && data.Response && Array.isArray(data.Response) && data.Response.length > 0) {
+                        this.trainSchedules[trainId] = data.Response.map((station, index) => {
+                            try {
+                                return {
+                                    stationDetailsId: station.StationDetailsId,
+                                    stationName: station.StationName ? station.StationName.trim() : null,
+                                    stationNameUR: station.StationNameUR ? station.StationNameUR.trim() : null,
+                                    arrivalTime: station.ArrivalTime,
+                                    departureTime: station.DepartureTime,
+                                    delayInMinutes: station.DelayInMinutes || 0,
+                                    orderNumber: index + 1,
+                                    isCrossed: station.IsCrossed || false,
+                                    crossedDateTime: station.CrossedDateTime,
+                                    latitude: station.Latitude,
+                                    longitude: station.Longitude,
+                                    city: station.City
+                                };
+                            } catch (stationError) {
+                                console.log(`⚠️ Error processing station ${index} in schedule:`, stationError, station);
+                                return null;
+                            }
+                        }).filter(s => s !== null);
+                        
+                        console.log(`✅ SCHEDULE LOADED for train ${trainId}: ${data.Response.length} stations`);
+                        
+                        this.trainSchedules[trainId].forEach(station => {
+                            if (station.stationDetailsId && station.stationName && !this.stationNames[station.stationDetailsId]) {
+                                this.stationNames[station.stationDetailsId.toString()] = {
+                                    id: station.stationDetailsId,
+                                    name: station.stationName,
+                                    nameUR: station.stationNameUR,
+                                    city: station.city
+                                };
+                            }
+                        });
+                        
+                        return true;
+                    } else {
+                        console.log(`❌ No schedule data returned for train ${trainId}:`, data);
+                        return false;
+                    }
+                } catch (error) {
+                    console.log(`❌ Schedule API call failed for train ${trainId}:`, error.message);
+                    return false;
+                }
+            }
+
+            getStationName(stationId) {
+                if (!stationId || stationId === '-1' || stationId === -1) {
+                    return 'Final Destination';
+                }
+                
+                if (stationId === '0' || stationId === 0) {
+                    return 'Starting Point';
+                }
+                
+                const station = this.stationNames[stationId.toString()];
+                if (station && station.name) {
+                    return station.name;
+                }
+                
+                for (const trainId in this.trainSchedules) {
+                    const schedule = this.trainSchedules[trainId];
+                    const foundStation = schedule.find(s => s.stationDetailsId == stationId);
+                    if (foundStation && foundStation.stationName) {
+                        this.stationNames[stationId.toString()] = {
+                            id: stationId,
+                            name: foundStation.stationName,
+                            nameUR: foundStation.stationNameUR,
+                            city: foundStation.city
+                        };
+                        return foundStation.stationName;
+                    }
+                }
+                
+                console.log(`⚠️ Station name not found for ID: ${stationId}`);
+                return `Station ${stationId}`;
+            }
+
+            calculateETA(scheduledTime, delayMinutes) {
+                if (!scheduledTime) return null;
+                
+                try {
+                    const [hours, minutes] = scheduledTime.split(':').map(Number);
+                    const today = new Date();
+                    const scheduledDateTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), hours, minutes);
+                    
+                    if (scheduledDateTime < today) {
+                        scheduledDateTime.setDate(scheduledDateTime.getDate() + 1);
+                    }
+                    
+                    const etaDateTime = new Date(scheduledDateTime.getTime() + (delayMinutes * 60000));
+                    
+                    return {
+                        scheduled: scheduledDateTime,
+                        eta: etaDateTime,
+                        formattedETA: etaDateTime.toLocaleTimeString('en-US', { 
+                            hour: '2-digit', 
+                            minute: '2-digit',
+                            hour12: true 
+                        }),
+                        formattedScheduled: scheduledDateTime.toLocaleTimeString('en-US', { 
+                            hour: '2-digit', 
+                            minute: '2-digit',
+                            hour12: true 
+                        })
+                    };
+                } catch (error) {
+                    return null;
+                }
+            }
+
+            calculateJourneyInfo(train, scheduleData) {
+                const now = new Date();
+                const info = {
+                    nextStationETA: null,
+                    nextStationArrivalTime: null,
+                    journeyProgress: 0,
+                    averageSpeed: 0,
+                    finalDestinationName: null,
+                    finalDestinationETA: null,
+                    upcomingStations: [],
+                    runningStatus: 'Unknown',
+                    runningStatusFormatted: 'Unknown'
+                };
+
+                if (!scheduleData || scheduleData.length === 0) {
+                    return info;
+                }
+
+                const currentStationIndex = scheduleData.findIndex(s => s.stationDetailsId == train.nextStation);
+                const totalStations = scheduleData.length;
+
+                if (currentStationIndex >= 0) {
+                    info.journeyProgress = Math.round((currentStationIndex / totalStations) * 100);
+
+                    const nextStation = scheduleData[currentStationIndex];
+                    if (nextStation && nextStation.arrivalTime) {
+                        const eta = this.calculateETA(nextStation.arrivalTime, train.delay);
+                        if (eta) {
+                            info.nextStationETA = eta.formattedETA;
+                            info.nextStationArrivalTime = nextStation.arrivalTime;
+                        }
+                    }
+
+                    info.upcomingStations = scheduleData
+                        .slice(currentStationIndex)
+                        .map(station => {
+                            const arrivalETA = station.arrivalTime ? this.calculateETA(station.arrivalTime, train.delay) : null;
+                            const departureETA = station.departureTime ? this.calculateETA(station.departureTime, train.delay) : null;
+                            
+                            return {
+                                name: station.stationName || this.getStationName(station.stationDetailsId),
+                                arrivalTime: station.arrivalTime,
+                                departureTime: station.departureTime,
+                                arrivalETA: arrivalETA ? arrivalETA.formattedETA : null,
+                                departureETA: departureETA ? departureETA.formattedETA : null,
+                                isCurrent: station.stationDetailsId == train.nextStation,
+                                stationId: station.stationDetailsId
+                            };
+                        });
+
+                    const finalStation = scheduleData[scheduleData.length - 1];
+                    if (finalStation) {
+                        info.finalDestinationName = finalStation.stationName || this.getStationName(finalStation.stationDetailsId);
+                        if (finalStation.arrivalTime) {
+                            const finalETA = this.calculateETA(finalStation.arrivalTime, train.delay);
+                            if (finalETA) {
+                                info.finalDestinationETA = finalETA.formattedETA;
+                            }
+                        }
+                    }
+                }
+
+                info.averageSpeed = train.speed;
+
+                // Enhanced running status with time formatting
+                if (train.delay === 0) {
+                    info.runningStatus = 'On Time';
+                    info.runningStatusFormatted = 'On Time';
+                } else if (train.delay > 0) {
+                    const hours = Math.floor(train.delay / 60);
+                    const minutes = train.delay % 60;
+                    if (hours > 0) {
+                        info.runningStatus = `${train.delay}m Late`;
+                        info.runningStatusFormatted = `${hours}h ${minutes}m Late`;
+                    } else {
+                        info.runningStatus = `${train.delay}m Late`;
+                        info.runningStatusFormatted = `${minutes}m Late`;
+                    }
+                } else {
+                    const absDelay = Math.abs(train.delay);
+                    const hours = Math.floor(absDelay / 60);
+                    const minutes = absDelay % 60;
+                    if (hours > 0) {
+                        info.runningStatus = `${absDelay}m Early`;
+                        info.runningStatusFormatted = `${hours}h ${minutes}m Early`;
+                    } else {
+                        info.runningStatus = `${absDelay}m Early`;
+                        info.runningStatusFormatted = `${minutes}m Early`;
+                    }
+                }
+
+                return info;
+            }
+
+            generateHMACSignature(input, secretKey) {
+                try {
+                    return btoa(input + secretKey).replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+                } catch (e) {
+                    return (input + secretKey).split('').map(c => c.charCodeAt(0).toString(16)).join('');
+                }
+            }
+
+            // Calculate distance between two coordinates in kilometers
+            calculateDistance(lat1, lon1, lat2, lon2) {
+                const R = 6371; // Earth's radius in kilometers
+                const dLat = (lat2 - lat1) * Math.PI / 180;
+                const dLon = (lon2 - lon1) * Math.PI / 180;
+                const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                        Math.sin(dLon/2) * Math.sin(dLon/2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                return R * c;
+            }
+
+            // Analyze train state based on location and speed
+        analyzeTrainState(train, scheduleData) {
+    if (!scheduleData || scheduleData.length === 0) return null;
+
+    const nextStationIndex = scheduleData.findIndex(s => s.stationDetailsId == train.nextStation);
+    if (nextStationIndex === -1) return null;
+
+    const nextStation = scheduleData[nextStationIndex];
+    if (!nextStation.latitude || !nextStation.longitude) return null;
+
+    const distance = this.calculateDistance(
+        train.latitude, train.longitude,
+        nextStation.latitude, nextStation.longitude
+    );
+
+    const currentStationInfo = this.detectCurrentStation(train, scheduleData);
+
+    const state = {
+        station: nextStation,
+        distance: distance,
+        speed: train.speed,
+        timestamp: Date.now(),
+        type: 'unknown',
+        currentStation: currentStationInfo
+    };
+
+    // Improved detection logic
+    if (distance <= this.stationReachedThreshold && train.speed <= 5) {
+        state.type = 'reached';
+        state.message = `Train reached ${nextStation.stationName}`;
+
+        if (!this.lastReachedStation || this.lastReachedStation.stationDetailsId !== nextStation.stationDetailsId) {
+            this.lastReachedStation = nextStation;
+            this.stoppedAtStationSince = Date.now();
+        }
+    } else if (this.lastReachedStation && train.speed > 5 && distance > 1) {
+    // Changed from speed > 10 to > 5, and distance > stationReachedThreshold to > 1
+    state.type = 'departing';
+    state.station = this.lastReachedStation;
+    state.message = `Train departing from ${this.lastReachedStation.stationName}`;
+    
+    // Clear the reached station once we're far enough away (changed from 2 to 3)
+    if (distance > 3) {
+        this.lastReachedStation = null;
+        this.stoppedAtStationSince = null;
+    }
+} else if (
+        distance <= 5 && // Increased approach distance to 5km
+        distance > this.stationReachedThreshold &&
+        train.speed > 0 && // Remove upper speed limit for approaching
+        (!this.lastReachedStation || this.lastReachedStation.stationDetailsId !== nextStation.stationDetailsId)
+    ) {
+        state.type = 'approaching';
+        state.message = `Train approaching ${nextStation.stationName}`;
+    } else if (distance > 5 && train.speed > 0) {
+        state.type = 'traveling';
+        state.message = `En route to ${nextStation.stationName}`;
+        this.stoppedAtStationSince = null;
+    } else if (train.speed === 0 && distance > this.stationReachedThreshold) {
+        state.type = 'stopped';
+        state.message = `Train stopped`;
+    }
+
+    return state;
+}
+
+            // Detect if train is currently stopped at a station
+            detectCurrentStation(train, scheduleData) {
+                if (train.speed > 3) { // If train is moving fast, it's not at a station
+                    this.currentStationStop = null;
+                    return null;
+                }
+
+                // Check all stations in the schedule to see which one train is closest to
+                let closestStation = null;
+                let minDistance = Infinity;
+
+                for (const station of scheduleData) {
+                    if (!station.latitude || !station.longitude) continue;
+                    
+                    const distance = this.calculateDistance(
+                        train.latitude, train.longitude,
+                        station.latitude, station.longitude
+                    );
+                    
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        closestStation = station;
+                    }
+                }
+
+                // If closest station is within 1km and train speed is very low, consider it "at station"
+                if (closestStation && minDistance <= 1.0 && train.speed <= 5) {
+                    const stationInfo = {
+                        station: closestStation,
+                        distance: minDistance,
+                        stoppedSince: this.stoppedAtStationSince || Date.now()
+                    };
+                    
+                    // Update stopped time if this is a new station stop
+                    if (!this.currentStationStop || 
+                        this.currentStationStop.station.stationDetailsId !== closestStation.stationDetailsId) {
+                        this.stoppedAtStationSince = Date.now();
+                        stationInfo.stoppedSince = Date.now();
+                    }
+                    
+                    this.currentStationStop = stationInfo;
+                    return stationInfo;
+                }
+                
+                this.currentStationStop = null;
+                return null;
+            }
+
+            // Calculate dynamic departure time based on actual arrival
+            calculateLiveDepartureTime(station, actualArrivalTime, scheduledStopDuration = 10) {
+                if (!actualArrivalTime) return null;
+
+                try {
+                    // Parse actual arrival time
+                    const [hours, minutes] = actualArrivalTime.split(':').map(Number);
+                    const arrivalDate = new Date();
+                    arrivalDate.setHours(hours, minutes, 0, 0);
+
+                    // Add stop duration
+                    const departureDate = new Date(arrivalDate.getTime() + (scheduledStopDuration * 60000));
+                    
+                    return {
+                        time: departureDate.toLocaleTimeString('en-US', { 
+                            hour: '2-digit', 
+                            minute: '2-digit',
+                            hour12: false 
+                        }),
+                        date: departureDate,
+                        isLive: true,
+                        stopDuration: scheduledStopDuration
+                    };
+                } catch (error) {
+                    return null;
+                }
+            }
+
+            // Show train alert popup
+        showTrainAlert(state) {
+    if (this.alertDebounceTimer) {
+        clearTimeout(this.alertDebounceTimer);
+    }
+
+    // Log for debugging
+    console.log(`📢 Alert requested: ${state.type} for ${state.station ? state.station.stationName : 'unknown station'}`);
+
+    // Only skip repeated approaching alerts with same distance
+    if (this.lastTrainState && 
+        this.lastTrainState.type === state.type && 
+        state.type === 'approaching' && 
+        Math.abs(this.lastTrainState.distance - state.distance) < 0.1) {
+        console.log('⏭️ Skipping duplicate approaching alert');
+        return;
+    }
+
+    this.alertDebounceTimer = setTimeout(() => {
+        this._showTrainAlertInternal(state);
+    }, 100);
+}
+
+_showTrainAlertInternal(state) {
+    // Only dismiss existing alert if it's a different type or different station
+    if (this.currentAlert) {
+        const shouldDismiss = 
+            (state.type === 'reached' && this.lastAlertType === 'approaching') ||
+            (state.type === 'departing' && this.lastAlertType === 'reached') ||
+            (state.type !== this.lastAlertType);
+            
+        if (shouldDismiss) {
+            this.dismissAlert();
+        } else {
+            return; // Don't show duplicate alerts
+        }
+    }
+
+    const alertContainer = document.createElement('div');
+    alertContainer.className = `train-alert-popup ${state.type}`;
+    alertContainer.id = 'trainAlert';
+
+    let icon, title, content;
+    const now = new Date();
+    const currentTime = now.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        hour12: true 
+    });
+
+    switch (state.type) {
+        case 'approaching':
+            icon = '🚂';
+            title = 'Train Approaching!';
+            content = `
+                <div class="alert-station">${state.station.stationName}</div>
+                <div style="font-size: 0.9em; opacity: 0.9;">
+                    Distance: ${state.distance.toFixed(1)} km • Speed: ${state.speed} km/h
+                </div>
+            `;
+            
+            // Auto-dismiss approaching alert after 30 seconds
+            setTimeout(() => {
+                if (this.currentAlert && this.lastAlertType === 'approaching') {
+                    this.dismissAlert();
+                }
+            }, 30000);
+            break;
+
+        case 'reached':
+            icon = '🏁';
+            title = 'Train Reached Station!';
+            
+            // Clear any existing timer
+            if (this.reachedAlertTimer) {
+                clearTimeout(this.reachedAlertTimer);
+            }
+            
+            // Calculate expected departure time (10 minutes from now)
+            const expectedDepartureTime = new Date(now.getTime() + 10 * 60000);
+            const formattedDepartureTime = expectedDepartureTime.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+            });
+            
+            content = `
+                <div class="alert-station">${state.station.stationName}</div>
+                <div style="margin: 8px 0;">
+                    <div class="alert-time">
+                        Arrived at: ${currentTime}
+                        <span class="live-schedule-badge">LIVE</span>
+                    </div>
+                    <div style="margin-top: 10px; font-size: 0.9em; opacity: 0.9;">
+                        Expected departure: ${formattedDepartureTime}
+                    </div>
+                </div>
+            `;
+            
+            // Auto-dismiss after 45 seconds
+            this.reachedAlertTimer = setTimeout(() => {
+                if (this.currentAlert && this.lastAlertType === 'reached') {
+                    this.dismissAlert();
+                }
+            }, 45000);
+            break;
+
+        case 'departing':
+            icon = '🚉';
+            title = 'Train Departing!';
+            
+            const departingStationName = state.station ? state.station.stationName : 'the station';
+            
+            content = `
+                <div class="alert-station">${departingStationName}</div>
+                <div style="margin: 8px 0;">
+                    <div style="font-size: 0.9em;">Train has started its journey!</div>
+                    <div style="margin-top: 5px; font-size: 0.85em; opacity: 0.8;">
+                        Speed: ${state.speed} km/h
+                    </div>
+                </div>
+            `;
+            
+            // Auto-dismiss after 10 seconds
+            setTimeout(() => {
+                if (this.currentAlert && this.lastAlertType === 'departing') {
+                    this.dismissAlert();
+                }
+            }, 10000);
+            break;
+
+        case 'stopped':
+            // Don't show alert for random stops
+            return;
+    }
+
+    alertContainer.innerHTML = `
+        <button class="alert-dismiss" onclick="tracker.dismissAlert()">×</button>
+        <div class="alert-header">
+            <div class="alert-icon">${icon}</div>
+            <div class="alert-title">${title}</div>
+        </div>
+        <div class="alert-content">
+            ${content}
+        </div>
+    `;
+
+    document.body.appendChild(alertContainer);
+    this.currentAlert = alertContainer;
+    this.lastAlertType = state.type; // Track the alert type
+
+    // Show with animation
+    setTimeout(() => {
+        alertContainer.classList.add('show');
+    }, 100);
+}
+
+showDeparturePreparationAlert(station, estimatedDepartureTime) {
+    if (this.currentAlert) {
+        this.dismissAlert();
+    }
+
+    const alertContainer = document.createElement('div');
+    alertContainer.className = 'train-alert-popup preparing';
+    alertContainer.id = 'trainAlert';
+    
+    // Add CSS class for preparing state
+    alertContainer.style.background = 'linear-gradient(135deg, #ff9800, #f57c00)';
+
+    alertContainer.innerHTML = `
+        <button class="alert-dismiss" onclick="tracker.dismissAlert()">×</button>
+        <div class="alert-header">
+            <div class="alert-icon">⏰</div>
+            <div class="alert-title">Preparing to Depart</div>
+        </div>
+        <div class="alert-content">
+            <div class="alert-station">${station.stationName}</div>
+            <div style="margin: 8px 0;">
+                <div class="alert-time">
+                    Train will start journey at: ${estimatedDepartureTime}
+                    <span class="live-schedule-badge">ESTIMATED</span>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(alertContainer);
+    this.currentAlert = alertContainer;
+
+    setTimeout(() => {
+        alertContainer.classList.add('show');
+    }, 100);
+    
+    // This alert will be automatically dismissed when train starts moving (departing state)
+}
+
+showDepartingAlert(station, departureTime) {
+    if (this.currentAlert) {
+        this.dismissAlert();
+    }
+
+    const alertContainer = document.createElement('div');
+    alertContainer.className = 'train-alert-popup departing';
+    alertContainer.id = 'trainAlert';
+
+    alertContainer.innerHTML = `
+        <button class="alert-dismiss" onclick="tracker.dismissAlert()">×</button>
+        <div class="alert-header">
+            <div class="alert-icon">⏰</div>
+            <div class="alert-title">Preparing to Depart</div>
+        </div>
+        <div class="alert-content">
+            <div class="alert-station">${station.stationName}</div>
+            <div style="margin: 8px 0;">
+                <div class="alert-time">
+                    Expected departure: ${departureTime}
+                    <span class="live-schedule-badge">ESTIMATED</span>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(alertContainer);
+    this.currentAlert = alertContainer;
+
+    setTimeout(() => {
+        alertContainer.classList.add('show');
+    }, 100);
+}
+            // Show train reached animation in station card
+            showTrainReachedAnimation(stationName) {
+    const stationCard = document.querySelector('.next-station-card');
+    if (!stationCard) return;
+
+    // Clear any existing animation
+    this.clearTrainReachedAnimation();
+
+    const animationDiv = document.createElement('div');
+    animationDiv.className = 'train-reached-animation';
+    animationDiv.innerHTML = `
+        <div class="reached-icon">🎉</div>
+        <div class="reached-text">
+            Train Reached!
+            <div class="reached-station-name">${stationName}</div>
+        </div>
+    `;
+
+    stationCard.appendChild(animationDiv);
+
+    // Show animation
+    setTimeout(() => {
+        animationDiv.classList.add('show');
+    }, 100);
+
+    // Auto-hide after 5 seconds
+    this.trainReachedAnimationTimeout = setTimeout(() => {
+        this.clearTrainReachedAnimation();
+    }, 5000);
+}
+
+clearTrainReachedAnimation() {
+    if (this.trainReachedAnimationTimeout) {
+        clearTimeout(this.trainReachedAnimationTimeout);
+        this.trainReachedAnimationTimeout = null;
+    }
+
+    const animation = document.querySelector('.train-reached-animation');
+    if (animation) {
+        animation.classList.remove('show');
+        setTimeout(() => {
+            if (animation.parentNode) {
+                animation.parentNode.removeChild(animation);
+            }
+        }, 500);
+    }
+}
+
+            // Dismiss current alert
+       dismissAlert() {
+    // Clear any pending timers
+    if (this.reachedAlertTimer) {
+        clearTimeout(this.reachedAlertTimer);
+        this.reachedAlertTimer = null;
+    }
+
+    if (this.currentAlert) {
+        this.currentAlert.classList.remove('show');
+        setTimeout(() => {
+            if (this.currentAlert && this.currentAlert.parentNode) {
+                this.currentAlert.parentNode.removeChild(this.currentAlert);
+            }
+            this.currentAlert = null;
+            this.lastAlertType = null; // Clear the alert type
+        }, 400);
+    }
+}
+
+processTrainLocation(train, scheduleData) {
+    if (!train || !scheduleData) return;
+
+    const currentState = this.analyzeTrainState(train, scheduleData);
+    if (!currentState) return;
+
+    // For midway tracking, determine initial state more accurately
+    if (!this.lastTrainState) {
+        if (currentState.distance <= this.stationReachedThreshold && train.speed <= 2) {
+            currentState.type = 'reached';
+            this.lastReachedStation = currentState.station;
+            this.stoppedAtStationSince = Date.now();
+        }
+        console.log('🚨 Initial state detection:', currentState.type);
+    }
+
+    // Add to history
+    this.trainStateHistory.push(currentState);
+    if (this.trainStateHistory.length > 10) {
+        this.trainStateHistory.shift();
+    }
+
+    // Check for valid state transitions
+    const isValidTransition = this.isValidStateTransition(this.lastTrainState?.type, currentState.type);
+    const shouldAlert = isValidTransition && this.shouldShowAlert(currentState);
+    
+    if (shouldAlert) {
+        console.log(`🚨 Showing Alert: ${currentState.type} - ${currentState.message}`);
+        this.showTrainAlert(currentState);
+    }
+
+    // Show train reached animation if needed
+    if (currentState.type === 'reached' && !document.querySelector('.train-reached-animation')) {
+        this.showTrainReachedAnimation(currentState.station.stationName);
+    }
+
+    // Clear animation if train starts moving
+    if ((currentState.type === 'traveling' || currentState.type === 'departing') && train.speed > 5) {
+        this.clearTrainReachedAnimation();
+    }
+
+    this.currentStationStop = currentState.currentStation;
+    this.lastTrainState = currentState;
+}
+
+            // Determine if we should show an alert
+     shouldShowAlert(newState) {
+    // Always show alerts for initial state or after train switch
+    if (!this.lastTrainState) {
+        return newState.type === 'approaching' || 
+               newState.type === 'reached' || 
+               newState.type === 'departing';
+    }
+
+    // Don't repeat the same alert for the same station
+    if (this.lastTrainState.type === newState.type && 
+        this.lastTrainState.station && newState.station &&
+        this.lastTrainState.station.stationDetailsId === newState.station.stationDetailsId) {
+        return false;
+    }
+
+    // Show approaching alert only once per station
+    if (newState.type === 'approaching') {
+        // Check if we've already shown approaching for this station
+        const recentApproach = this.trainStateHistory.slice(-5).find(state => 
+            state.type === 'approaching' && 
+            state.station.stationDetailsId === newState.station.stationDetailsId
+        );
+        return !recentApproach;
+    }
+
+    // Always show reached and departing alerts
+    if (newState.type === 'reached' || newState.type === 'departing') {
+        return true;
+    }
+
+    return false;
+}
+
+isValidStateTransition(fromType, toType) {
+    // First state is always valid
+    if (!fromType) return true;
+    
+    // Same state is not a transition
+    if (fromType === toType) return false;
+    
+    // Define valid state transitions
+    const validTransitions = {
+        'traveling': ['approaching', 'reached', 'stopped'],
+        'approaching': ['reached', 'stopped'],
+        'reached': ['departing'],
+        'departing': ['traveling', 'approaching'],
+        'stopped': ['departing', 'traveling', 'approaching', 'reached']
+    };
+    
+    return validTransitions[fromType]?.includes(toType) || false;
+}
+
+            requestLiveTrains() {
+                if (this.socket && this.isConnected) {
+                    this.socket.emit('track-all', '');
+                }
+            }
+
+            processLiveTrainsData(data) {
+                const existingSchedules = {};
+                for (const uniqueTrainKey in this.liveTrains) {
+                    if (this.liveTrains[uniqueTrainKey].scheduleData) {
+                        existingSchedules[uniqueTrainKey] = this.liveTrains[uniqueTrainKey].scheduleData;
+                        
+                        const originalTrainId = this.liveTrains[uniqueTrainKey].trainId.toString();
+                        if (!existingSchedules[originalTrainId]) {
+                            existingSchedules[originalTrainId] = this.liveTrains[uniqueTrainKey].scheduleData;
+                        }
+                    }
+                }
+
+                const oldSelectedTrainId = this.selectedTrainId;
+                this.liveTrains = {};
+                let totalTrains = 0;
+
+                for (const trainId in data) {
+                    const trainRides = data[trainId];
+                    
+                    for (const rideId in trainRides) {
+                        const rideData = trainRides[rideId];
+                        totalTrains++;
+                        
+                        let trainInfo = this.trainNames[trainId];
+                        if (!trainInfo) {
+                            const trainNumber = parseInt(trainId);
+                            const isUp = trainNumber % 2 === 1;
+                            const direction = isUp ? 'UP' : 'DN';
+                            
+                            trainInfo = {
+                                id: trainNumber,
+                                number: trainNumber,
+                                name: `Train ${trainNumber}${direction}`,
+                                isUp: isUp
+                            };
+                            
+                            this.trainNames[trainId] = trainInfo;
+                        }
+                        
+                        const uniqueTrainKey = `${trainId}-${rideId}`;
+                        
+                        let scheduleData = null;
+                        if (existingSchedules[uniqueTrainKey]) {
+                            scheduleData = existingSchedules[uniqueTrainKey];
+                        } else if (existingSchedules[trainId]) {
+                            scheduleData = existingSchedules[trainId];
+                        } else if (this.trainSchedules[trainId]) {
+                            scheduleData = this.trainSchedules[trainId];
+                        }
+                        
+                        this.liveTrains[uniqueTrainKey] = {
+                            trainId: parseInt(trainId),
+                            trainNumber: trainInfo.number,
+                            trainName: trainInfo.name,
+                            trainNameUR: trainInfo.nameUR,
+                            isUp: trainInfo.isUp,
+                            rideId: rideId,
+                            latitude: parseFloat(rideData.lat),
+                            longitude: parseFloat(rideData.lon),
+                            speed: parseInt(rideData.sp) || 0,
+                            delay: parseInt(rideData.late_by) || 0,
+                            lastUpdated: parseInt(rideData.last_updated),
+                            nextStation: rideData.next_st,
+                            previousStation: rideData.prev_st,
+                            status: rideData.st,
+                            locomotiveNo: rideData.locomitiveNo,
+                            lastUpdatedTime: new Date(parseInt(rideData.last_updated) * 1000),
+                            scheduleData: scheduleData,
+                            uniqueId: uniqueTrainKey
+                        };
+                    }
+                }
+
+                this.updateStatus(`🚂 Tracking ${totalTrains} live trains`, 'connected');
+                document.getElementById('trainCount').textContent = `${totalTrains} live trains`;
+                document.getElementById('lastUpdate').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+                
+                console.log(`📊 Live data updated: ${totalTrains} trains active`);
+
+                if (oldSelectedTrainId) {
+                    if (this.liveTrains[oldSelectedTrainId]) {
+                        this.selectedTrainId = oldSelectedTrainId;
+                        console.log(`✅ Preserved exact selection: ${oldSelectedTrainId}`);
+                    } else {
+                        const foundTrain = Object.keys(this.liveTrains).find(key => {
+                            const train = this.liveTrains[key];
+                            return key === oldSelectedTrainId || 
+                                   key.startsWith(oldSelectedTrainId + '-') ||
+                                   train.trainId.toString() === oldSelectedTrainId;
+                        });
+                        
+                        if (foundTrain) {
+                            this.selectedTrainId = foundTrain;
+                            console.log(`🔄 Updated selection from ${oldSelectedTrainId} to ${foundTrain}`);
+                            
+                            if (!this.liveTrains[foundTrain].scheduleData) {
+                                const originalTrainId = this.liveTrains[foundTrain].trainId.toString();
+                                if (this.trainSchedules[originalTrainId]) {
+                                    console.log(`🔄 Restoring schedule data for train ${foundTrain}`);
+                                    this.liveTrains[foundTrain].scheduleData = this.trainSchedules[originalTrainId];
+                                }
+                            }
+                        } else {
+                            console.log(`⚠️ Previously selected train ${oldSelectedTrainId} not found in new data`);
+                            this.selectedTrainId = null;
+                        }
+                    }
+                }
+            }
+
+            updateTrainSelect() {
+    const select = document.getElementById('trainSelect');
+    const currentValue = select.value;
+    
+    // Create new options without clearing to prevent flicker
+    const fragment = document.createDocumentFragment();
+    const defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.textContent = 'Select a train to track...';
+    fragment.appendChild(defaultOption);
+                
+    const sortedTrains = Object.values(this.liveTrains).sort((a, b) => a.trainNumber - b.trainNumber);
+    
+    const trainGroups = {};
+    sortedTrains.forEach(train => {
+        const direction = train.isUp ? 'UP' : 'DOWN';
+        const key = `${train.trainNumber} - ${train.trainName} (${direction})`;
+        
+        if (!trainGroups[key]) {
+            trainGroups[key] = [];
+        }
+        trainGroups[key].push(train);
+    });
+    
+    Object.keys(trainGroups).forEach(trainKey => {
+        const trains = trainGroups[trainKey];
+        const option = document.createElement('option');
+        
+        if (trains.length > 1) {
+            option.value = `MULTIPLE:${trainKey}`;
+            option.textContent = `${trainKey} (${trains.length} instances)`;
+        } else {
+            option.value = trains[0].uniqueId;
+            option.textContent = trainKey;
+        }
+        
+        fragment.appendChild(option);
+    });
+    
+    // FIRST: Update the DOM with new options
+    select.innerHTML = '';
+    select.appendChild(fragment);
+    
+    // THEN: Restore selection on the NEW options
+    if (this.selectedTrainId) {
+        // Now get options from the updated select element
+        const newOptions = Array.from(select.options);
+        const matchingOption = newOptions.find(opt => opt.value === this.selectedTrainId);
+        
+        if (matchingOption) {
+            select.value = this.selectedTrainId;
+            console.log(`✅ Restored dropdown selection: ${this.selectedTrainId}`);
+        } else {
+            // Fallback: try to find by pattern matching
+            const originalTrainId = this.selectedTrainId.includes('-') ? 
+                this.selectedTrainId.split('-')[0] : this.selectedTrainId;
+            
+            const patternMatch = newOptions.find(opt => 
+                opt.value.startsWith(originalTrainId + '-') ||
+                opt.value === originalTrainId ||
+                opt.value.startsWith('MULTIPLE:') && opt.value.includes(originalTrainId)
+            );
+            
+            if (patternMatch) {
+                select.value = patternMatch.value;
+                console.log(`🔄 Updated dropdown selection to: ${patternMatch.value}`);
+                
+                // If it's a multiple train option, don't auto-update selectedTrainId
+                if (!patternMatch.value.startsWith('MULTIPLE:')) {
+                    this.selectedTrainId = patternMatch.value;
+                }
+            } else {
+                console.log(`⚠️ Could not restore selection for: ${this.selectedTrainId}`);
+                select.value = '';
+            }
+        }
+    }
+    
+    select.disabled = false;
+}
+
+
+        saveScheduleScrollPosition() {
+    const scheduleEl = document.querySelector('.schedule-timeline');
+    if (scheduleEl) {
+        this.scheduleScrollPosition = scheduleEl.scrollTop;
+        console.log('📍 Saved scroll position:', this.scheduleScrollPosition);
+    }
+}
+
+// Restore scroll position after update
+restoreScheduleScrollPosition() {
+    const scheduleEl = document.querySelector('.schedule-timeline');
+    if (scheduleEl && this.scheduleScrollPosition > 0) {
+        // Use requestAnimationFrame to ensure DOM is updated
+        requestAnimationFrame(() => {
+            scheduleEl.scrollTop = this.scheduleScrollPosition;
+            console.log('📍 Restored scroll position:', this.scheduleScrollPosition);
+        });
+    }
+}
+
+// Smooth update wrapper
+smoothUpdate(updateFunction) {
+    const detailsEl = document.getElementById('trainDetails');
+    if (!detailsEl) return;
+    
+    // Add updating class for visual feedback
+    detailsEl.classList.add('updating');
+    
+    // Save scroll position
+    this.saveScheduleScrollPosition();
+    
+    // Set flag to prevent multiple updates
+    this.isUpdatingDisplay = true;
+    
+    // Perform update
+    requestAnimationFrame(() => {
+        updateFunction();
+        
+        // Restore scroll position after DOM update
+        requestAnimationFrame(() => {
+            this.restoreScheduleScrollPosition();
+            detailsEl.classList.remove('updating');
+            this.isUpdatingDisplay = false;
+        });
+    });
+}
+
+            formatDelay(delayMinutes) {
+                if (delayMinutes === 0) {
+                    return { text: 'On time', class: 'delay-on-time' };
+                }
+                
+                const absDelay = Math.abs(delayMinutes);
+                const isLate = delayMinutes > 0;
+                
+                if (absDelay >= 60) {
+                    const hours = Math.floor(absDelay / 60);
+                    const minutes = absDelay % 60;
+                    const text = minutes > 0 ? 
+                        `${hours}h ${minutes}m ${isLate ? 'late' : 'early'}` :
+                        `${hours}h ${isLate ? 'late' : 'early'}`;
+                    return {
+                        text,
+                        class: isLate ? 'delay-late' : 'delay-early'
+                    };
+                } else {
+                    return {
+                        text: `${absDelay}m ${isLate ? 'late' : 'early'}`,
+                        class: isLate ? 'delay-late' : 'delay-early'
+                    };
+                }
+            }
+
+           smoothUpdate(updateFunction) {
+    const detailsEl = document.getElementById('trainDetails');
+    if (!detailsEl) return;
+
+    if (this.isUpdatingDisplay) {
+        console.log('⏸️ Update already in progress, queuing...');
+        return;
+    }
+
+    this.isUpdatingDisplay = true;
+    detailsEl.classList.add('updating');
+    this.saveScheduleScrollPosition();
+
+    requestAnimationFrame(() => {
+        try {
+            updateFunction();
+            requestAnimationFrame(() => {
+                this.restoreScheduleScrollPosition();
+                detailsEl.classList.remove('updating');
+                this.isUpdatingDisplay = false;
+            });
+        } catch (error) {
+            console.error('❌ Update failed:', error);
+            detailsEl.classList.remove('updating');
+            this.isUpdatingDisplay = false;
+        }
+    });
+}
+
+displaySelectedTrain() {
+    const detailsEl = document.getElementById('trainDetails');
+    
+    if (!this.selectedTrainId || !this.liveTrains[this.selectedTrainId]) {
+        detailsEl.innerHTML = `
+            <div class="loading">
+                <div class="spinner"></div>
+                Select a train to view complete tracking information
+            </div>
+        `;
+        detailsEl.classList.remove('visible');
+        return;
+    }
+    
+    const train = this.liveTrains[this.selectedTrainId];
+    const delay = this.formatDelay(train.delay);
+    const direction = train.isUp ? 'UP' : 'DOWN';
+    const originalTrainId = train.trainId.toString();
+    let scheduleData = train.scheduleData || this.trainSchedules[originalTrainId] || null;
+
+    if (!scheduleData) {
+        console.log(`⚠️ No schedule data for train ${this.selectedTrainId} (original: ${originalTrainId}), attempting reload...`);
+        detailsEl.innerHTML = `
+            <div class="loading">
+                <div class="spinner"></div>
+                Loading schedule for train ${this.selectedTrainId}...
+            </div>
+        `;
+        detailsEl.classList.add('visible');
+        
+        this.loadSpecificTrainSchedule(originalTrainId).then((loaded) => {
+            if (loaded && this.liveTrains[this.selectedTrainId]) {
+                console.log(`✅ Schedule reloaded for train ${this.selectedTrainId}, updating display...`);
+                this.liveTrains[this.selectedTrainId].scheduleData = this.trainSchedules[originalTrainId];
+                this.smoothUpdate(() => this.displaySelectedTrain());
+            } else {
+                detailsEl.innerHTML = `
+                    <div class="error-message">
+                        ❌ Failed to load schedule for this train. 
+                        <br><button onclick="tracker.loadSpecificTrainSchedule('${originalTrainId}').then(() => { tracker.liveTrains['${this.selectedTrainId}'].scheduleData = tracker.trainSchedules['${originalTrainId}']; tracker.smoothUpdate(() => tracker.displaySelectedTrain()); })" class="retry-button">🔄 Retry Loading Schedule</button>
+                    </div>
+                `;
+                detailsEl.classList.add('visible');
+            }
+        });
+        return;
+    }
+
+    const nextStationName = this.getStationName(train.nextStation);
+    const journeyInfo = this.calculateJourneyInfo(train, scheduleData);
+    this.processTrainLocation(train, scheduleData);
+
+    let scheduleDisplay = '';
+    if (scheduleData && scheduleData.length > 0) {
+        console.log(`📅 DISPLAYING SCHEDULE for train ${this.selectedTrainId}: ${scheduleData.length} stations`);
+        scheduleDisplay = `
+            <div class="schedule-timeline">
+                <div class="schedule-header">
+                    <div>No.</div>
+                    <div>Station</div>
+                    <div>Arrival</div>
+                    <div>Departure</div>
+                    <div>Status</div>
+                </div>
+                <div class="schedule-body">
+                    ${scheduleData.map((station, index) => {
+                        const nextStationIndex = scheduleData.findIndex(s => s.stationDetailsId == train.nextStation);
+                        let stationClass = '';
+                        let statusClass = '';
+                        let statusText = '';
+
+                        if (index < nextStationIndex) {
+                            stationClass = 'passed-station';
+                            statusClass = 'status-passed';
+                            statusText = 'Departed';
+                        } else if (index === nextStationIndex) {
+                            stationClass = 'current-station';
+                            statusClass = 'status-next';
+                            statusText = 'Next';
+                        } else {
+                            stationClass = '';
+                            statusClass = 'status-upcoming';
+                            statusText = 'Upcoming';
+                        }
+
+                        if (station.isCrossed === true) {
+                            stationClass = 'passed-station';
+                            statusClass = 'status-passed';
+                            statusText = 'Departed';
+                        }
+
+                        const arrivalETA = this.calculateETA(station.arrivalTime, train.delay);
+                        const departureETA = this.calculateETA(station.departureTime, train.delay);
+                        const isTrainAtStation = this.lastTrainState && 
+                            this.lastTrainState.type === 'reached' && 
+                            this.lastTrainState.station.stationDetailsId === station.stationDetailsId;
+                        let liveDepartureTime = null;
+                        const isLastStation = index === scheduleData.length - 1;
+
+                        if (isTrainAtStation && !isLastStation) {
+                            liveDepartureTime = this.calculateLiveDepartureTime(
+                                station, 
+                                new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+                            );
+                        }
+
+                        const getTimeClass = (hasDelay) => {
+                            if (train.delay === 0) return 'on-time';
+                            return train.delay > 0 ? 'delayed' : 'early';
+                        };
+
+                        return `
+                            <div class="schedule-item ${stationClass}">
+                                <div class="station-order">${station.orderNumber}</div>
+                                <div class="station-info">
+                                    <div class="station-name">${station.stationName || this.getStationName(station.stationDetailsId)}</div>
+                                    ${station.city ? `<div class="station-details">${station.city}</div>` : ''}
+                                </div>
+                                <div class="time-cell">
+                                    ${station.arrivalTime ? `
+                                        <div class="scheduled-time">${station.arrivalTime}</div>
+                                        ${arrivalETA ? `<div class="actual-time ${getTimeClass()}">${arrivalETA.formattedETA}</div>` : ''}
+                                    ` : '<div class="scheduled-time">—</div>'}
+                                </div>
+                                <div class="time-cell">
+                                    ${!isLastStation && station.departureTime ? `
+                                        <div class="scheduled-time">
+                                            ${station.departureTime}
+                                            ${liveDepartureTime ? '<span class="live-schedule-badge">LIVE</span>' : ''}
+                                        </div>
+                                        ${liveDepartureTime ? `
+                                            <div class="actual-time ${getTimeClass()}" style="background: #4caf50; color: white;">
+                                                ${liveDepartureTime.time}
+                                            </div>
+                                        ` : departureETA ? `
+                                            <div class="actual-time ${getTimeClass()}">${departureETA.formattedETA}</div>
+                                        ` : ''}
+                                    ` : '<div class="scheduled-time">—</div>'}
+                                </div>
+                                <div class="status-cell">
+                                    <div class="status-badge ${statusClass}">${statusText}</div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+    } else {
+        console.log(`❌ NO SCHEDULE DATA for train ${this.selectedTrainId}`);
+        scheduleDisplay = `
+            <div class="error-message">
+                ❌ Schedule not loaded for this train. 
+                <br><button onclick="tracker.loadSpecificTrainSchedule('${originalTrainId}').then(() => { tracker.liveTrains['${this.selectedTrainId}'].scheduleData = tracker.trainSchedules['${originalTrainId}']; tracker.smoothUpdate(() => tracker.displaySelectedTrain()); })" class="retry-button">🔄 Retry Loading Schedule</button>
+            </div>
+        `;
+    }
+
+    let statusClass = 'status-on-time';
+    if (train.delay > 0) {
+        statusClass = 'status-late';
+    } else if (train.delay < 0) {
+        statusClass = 'status-early';
+    }
+
+    detailsEl.innerHTML = `
+        <div class="train-header">
+            <div class="train-name">${train.trainName}</div>
+        </div>
+        <div class="info-grid">
+            <div class="info-card next-station-card">
+                <div class="station-details-header">
+                    <h3>Station Details</h3>
+                    <div class="station-status-badge ${train.speed > 5 ? 'status-moving' : 'status-stopped'}">
+                        ${train.speed > 5 ? '🚄 Moving' : '🛑 Stopped'}
+                    </div>
+                </div>
+                ${this.currentStationStop && this.currentStationStop.station ? `
+                    <div class="currently-at-station">
+                        <div class="currently-at-text">Currently Stopped At:</div>
+                        <div class="current-station-name">${this.currentStationStop.station.stationName || this.getStationName(this.currentStationStop.station.stationDetailsId)}</div>
+                        <div style="font-size: 0.85em; color: #bf360c; margin-top: 5px;"></div>
+                    </div>
+                    <div class="info-item" style="margin-top: 15px;">
+                        <span class="info-label">Next Destination:</span>
+                        <span class="info-value station-name">${nextStationName}</span>
+                    </div>
+                    <div class="route-display" style="background: linear-gradient(135deg, #E8F5E8, #C8E6C8); border-left: 3px solid #4CAF50;">
+                        <strong>Next: ${nextStationName}</strong>
+                    </div>
+                ` : `
+                    <div class="info-item">
+                        <span class="info-label">Next Destination:</span>
+                        <span class="info-value station-name">${nextStationName}</span>
+                    </div>
+                    <div class="route-display">
+                        <strong>${nextStationName}</strong>
+                    </div>
+                `}
+                ${journeyInfo.nextStationETA ? `
+                    <div style="background: rgba(76, 175, 80, 0.1); padding: 10px; border-radius: 8px; margin-top: 10px;">
+                        <div style="font-size: 0.9em; color: #2e7d32; margin-bottom: 5px;">Expected Arrival:</div>
+                        <div style="font-size: 1.1em; font-weight: bold; color: #1b5e20;">${journeyInfo.nextStationETA}</div>
+                    </div>
+                ` : ''}
+            </div>
+            <div class="info-card journey-card">
+                <h3>Journey Progress & Estimated Time</h3>
+                ${journeyInfo.nextStationETA ? `
+                    <div class="info-item">
+                        <span class="info-label">Next ${nextStationName} Arrival:</span>
+                        <span class="info-value" style="color: #ff5722; font-weight: bold;">${journeyInfo.nextStationETA}</span>
+                    </div>
+                ` : ''}
+                <div class="info-item">
+                    <span class="info-label">Journey Progress:</span>
+                    <span class="info-value">${journeyInfo.journeyProgress}% Complete</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: ${journeyInfo.journeyProgress}%"></div>
+                </div>
+                ${journeyInfo.finalDestinationName && journeyInfo.finalDestinationETA ? `
+                    <div class="info-item">
+                        <span class="info-label">${journeyInfo.finalDestinationName} Arrival:</span>
+                        <span class="info-value" style="color: #d32f2f; font-weight: bold;">${journeyInfo.finalDestinationETA}</span>
+                    </div>
+                ` : ''}
+                <div class="info-item">
+                    <span class="info-label">Running Status:</span>
+                    <span class="running-status ${statusClass}">${journeyInfo.runningStatusFormatted}</span>
+                </div>
+                ${journeyInfo.upcomingStations.length > 0 ? `
+                    <div class="upcoming-stations">
+                        <strong style="color: #9c27b0; font-size: 0.95em;">Complete Journey Route:</strong>
+                        ${journeyInfo.upcomingStations.map((station, index) => `
+                            <div class="upcoming-station-item ${station.isCurrent ? 'current-next' : ''}">
+                                <span>
+                                    <strong>${index + 1}.</strong> ${station.name}
+                                    ${station.isCurrent ? ' <span style="color: #ff9800;">← NEXT</span>' : ''}
+                                </span>
+                                <div style="text-align: right; font-family: 'Courier New', monospace; font-size: 0.85em;">
+                                    ${station.arrivalETA ? `<div style="color: #4caf50;">Arr: ${station.arrivalETA}</div>` : ''}
+                                    ${(!journeyInfo.upcomingStations || index !== journeyInfo.upcomingStations.length - 1) && station.departureETA ? `<div style="color: #f44336;">Dep: ${station.departureETA}</div>` : ''}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+            </div>
+            <div class="info-card">
+                <h3>⚡ Live Status</h3>
+                <div class="info-item">
+                    <span class="info-label">Speed:</span>
+                    <span class="info-value speed-value">${train.speed} km/h</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Delay:</span>
+                    <span class="info-value delay-value ${delay.class}">${delay.text}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Locomotive:</span>
+                    <span class="info-value">${train.locomotiveNo || 'N/A'}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Status:</span>
+                    <span class="info-value">${train.status || 'Moving'}</span>
+                </div>
+            </div>
+            <div class="info-card full-width-card">
+                <h3>Complete Train Schedule</h3>
+                ${scheduleDisplay}
+            </div>
+            <div class="info-card full-width-card">
+                <h3>Current Location</h3>
+                <div class="coordinates">
+                    Latitude: ${train.latitude.toFixed(6)}<br>
+                    Longitude: ${train.longitude.toFixed(6)}
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Last Updated:</span>
+                    <span class="info-value">${train.lastUpdatedTime.toLocaleString()}</span>
+                </div>
+                <a href="https://maps.google.com/?q=${train.latitude},${train.longitude}" 
+                   target="_blank" class="maps-link">
+                    View Current Location on Google Maps
+                </a>
+            </div>
+        </div>
+    `;
+    detailsEl.classList.add('visible');
+}
+
+            startPeriodicUpdates() {
+                this.updateInterval = setInterval(() => {
+                    if (this.isConnected) {
+                        this.requestLiveTrains();
+                    }
+                    this.countdown = 30;
+                }, 30000);
+                
+                this.countdownInterval = setInterval(() => {
+                    this.countdown--;
+                    if (this.countdown <= 0) {
+                        this.countdown = 30;
+                    }
+                    document.getElementById('nextUpdate').textContent = `Next update in: ${this.countdown}s`;
+                }, 1000);
+            }
+
+            pauseUpdates() {
+                if (this.updateInterval) {
+                    clearInterval(this.updateInterval);
+                    this.updateInterval = null;
+                }
+                if (this.countdownInterval) {
+                    clearInterval(this.countdownInterval);
+                    this.countdownInterval = null;
+                }
+                if (this.socket && this.isConnected) {
+                    this.socket.disconnect();
+                    this.isConnected = false;
+                }
+                this.updateStatus('⏸️ Updates paused (tab inactive)', 'connecting');
+            }
+
+            resumeUpdates() {
+                if (!this.updateInterval) {
+                    this.startPeriodicUpdates();
+                }
+                if (!this.isConnected) {
+                    this.connectWithFallback();
+                }
+                this.updateStatus('🔄 Resuming live tracking...', 'connecting');
+            }
+
+         destroy() {
+    if (this.updateInterval) clearInterval(this.updateInterval);
+    if (this.countdownInterval) clearInterval(this.countdownInterval);
+    if (this.trainReachedAnimationTimeout) clearTimeout(this.trainReachedAnimationTimeout);
+    if (this.alertDebounceTimer) clearTimeout(this.alertDebounceTimer);
+    if (this.reachedAlertTimer) clearTimeout(this.reachedAlertTimer);
+    if (this.socket) this.socket.disconnect();
+    this.dismissAlert();
+    this.clearTrainReachedAnimation();
+    this.lastReachedStation = null; // Add this line
+}
+        }
+
+        let tracker;
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            tracker = new PakRailWebTracker();
+            window.tracker = tracker;
+        });
+
+        window.addEventListener('beforeunload', () => {
+            if (tracker) {
+                tracker.dismissAlert();
+                tracker.destroy();
+            }
+        });
+
+        document.addEventListener('visibilitychange', () => {
+            if (tracker) {
+                if (document.hidden) {
+                    tracker.pauseUpdates();
+                } else {
+                    tracker.resumeUpdates();
+                }
+            }
+        });
+    </script>
+</body>
+</html>
