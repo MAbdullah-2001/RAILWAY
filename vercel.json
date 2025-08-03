@@ -1,23 +1,16 @@
 {
-         "version": 2,
-         "builds": [
-             {
-                 "src": "index.html",
-                 "use": "@vercel/static"
-             },
-             {
-                 "src": "api/getConfig.js",
-                 "use": "@vercel/node"
-             }
-         ],
-         "routes": [
-             {
-                 "src": "/api/getConfig",
-                 "dest": "/api/getConfig.js"
-             },
-             {
-                 "src": "/(.*)",
-                 "dest": "/index.html"
-             }
-         ]
-     }
+  "rewrites": [
+    {
+      "source": "/api/proxy/:path*",
+      "destination": "/api/proxy/[...path].js"
+    },
+    {
+      "source": "/api/getConfig",
+      "destination": "/api/getConfig.js"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
