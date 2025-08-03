@@ -1356,71 +1356,59 @@ select {
             }
 
             async connect(socketUrl = null) {
-                const urlToUse = socketUrl || this.config.socketUrl;
-                
-                return new Promise((resolve, reject) => {
-                    try {
-                        const timestamp = Math.floor(Date.now() / 1000);
-                        const appSignature = "android_app_signature_trackmytrain";
-                        const hmacInput = appSignature + this.config.FB_SEP_KEY + timestamp;
-                        const hmacSignature = this.generateHMACSignature(hmacInput, this.config.FB_SEC_KEY);
-                        
-                        const headers = {
-                            'x-app-signature': appSignature,
-                            'x-timestamp': timestamp.toString(),
-                            'x-hmac': hmacSignature,
-                            [this.config.FB_SOCKET_KEY]: this.config.FB_SOCKET_VAL,
-                            'jungle': 'gaali'
-                        };
+            const urlToUse = socketUrl || this.config.socketUrl;
+            return new Promise((resolve, reject) => {
+                try {
+                    const timestamp = Math.floor(Date.now() / 1000);
+                    const appSignature = "android_app_signature_trackmytrain";
+                    const hmacInput = appSignature + this.config.FB_SEP_KEY + timestamp;
+                    const hmacSignature = this.generateHMACSignature(hmacInput, this.config.FB_SEC_KEY);
+                    
+                    const headers = {
+                        'x-app-signature': appSignature,
+                        'x-timestamp': timestamp.toString(),
+                        'x-hmac': hmacSignature,
+                        [this.config.FB_SOCKET_KEY]: this.config.FB_SOCKET_VAL,
+                        'jungle': 'gaali'
+                    };
 
-                        this.socket = io(urlToUse, {
-                            transports: ['websocket', 'polling'],
-                            timeout: 10000,
-                            forceNew: true,
-                            extraHeaders: headers
-                        });
+                    this.socket = io('/api/socket', {
+                        transports: ['websocket', 'polling'],
+                        timeout: 10000,
+                        forceNew: true,
+                        extraHeaders: headers
+                    });
 
-                        this.socket.on('connect', () => {
-                            console.log('✅ Connected to PakRail Live Socket');
-                            this.isConnected = true;
-                            this.updateStatus('🎉 Live tracking active! Loading train data...', 'connected');
-                            this.requestLiveTrains();
-                            resolve();
-                        });
+                    this.socket.on('connect', () => {
+                        console.log('✅ Connected to PakRail Live Socket via proxy');
+                        this.isConnected = true;
+                        this.updateStatus('🎉 Live tracking active! Loading train data...', 'connected');
+                        this.requestLiveTrains();
+                        resolve();
+                    });
 
-                        this.socket.on('track-all', (data) => {
-                            this.processLiveTrainsData(data);
-
-                            this.updateTrainSelect();
-// Only update display if not already updating
-if (!this.isUpdatingDisplay && this.selectedTrainId) {
-    this.smoothUpdate(() => this.displaySelectedTrain());
-}
-                            this.displaySelectedTrain();
-                        });
-
-                        this.socket.on('connect_error', (error) => {
-                            console.log('❌ Socket connection error:', error);
-                            reject(error);
-                        });
-
-                        this.socket.on('disconnect', (reason) => {
-                            console.log('🔌 Socket disconnected:', reason);
-                            this.isConnected = false;
-                            this.updateStatus('🔌 Disconnected. Reconnecting...', 'error');
-                        });
-
-                        setTimeout(() => {
-                            if (!this.isConnected) {
-                                reject(new Error('Connection timeout'));
-                            }
-                        }, 15000);
-
-                    } catch (error) {
+                    this.socket.on('connect_error', (error) => {
+                        console.log('❌ Socket connection error:', error);
                         reject(error);
-                    }
-                });
-            }
+                    });
+
+                    this.socket.on('disconnect', (reason) => {
+                        console.log('🔌 Socket disconnected:', reason);
+                        this.isConnected = false;
+                        this.updateStatus('🔌 Disconnected. Reconnecting...', 'error');
+                    });
+
+                    setTimeout(() => {
+                        if (!this.isConnected) {
+                            reject(new Error('Connection timeout'));
+                        }
+                    }, 15000);
+
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        }
 
            showTrainSelectionDialog(trains) {
     const detailsEl = document.getElementById('trainDetails');
@@ -1663,175 +1651,171 @@ if (!this.isUpdatingDisplay && this.selectedTrainId) {
             }
 
             async loadTrainNames() {
-                console.log('🚂 Loading train names from Train/GetLiveTrains...');
+            console.log('🚂 Loading train names via proxy...');
+            try {
+                const response = await fetch('/api/proxy/Train/GetLiveTrains', {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
                 
-                try {
-                    const response = await fetch(`${this.config.apiBase}Train/GetLiveTrains`, {
-                        method: 'GET',
-                        headers: {
-                            'Accept': 'application/json',
-                            'Content-Type': 'application/json'
+                if (data && data.Response && Array.isArray(data.Response)) {
+                    data.Response.forEach(train => {
+                        this.trainNames[train.TrainId.toString()] = {
+                            id: train.TrainId,
+                            number: train.TrainNumber,
+                            name: train.TrainName,
+                            nameUR: train.TrainNameUR,
+                            nameWithNumber: train.TrainNameWithNumber,
+                            description: train.TrainDescription,
+                            isLive: train.IsLive,
+                            isUp: train.IsUp,
+                            imei: train.Imei
+                        };
+                    });
+                    
+                    console.log(`✅ Loaded ${data.Response.length} train names`);
+                    return true;
+                } else {
+                    console.log('⚠️ No train data in response:', data);
+                    return false;
+                }
+            } catch (error) {
+                console.log('❌ Failed to load train names:', error.message);
+                return false;
+            }
+        }
+
+        async loadStationNames() {
+            console.log('🚉 Loading station names via proxy...');
+            try {
+                const response = await fetch('/api/proxy/Station/GetStations', {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                
+                if (data && data.Response && Array.isArray(data.Response)) {
+                    this.stationNames = {};
+                    data.Response.forEach((station, index) => {
+                        try {
+                            const stationId = station.StationDetailsId;
+                            const stationName = station.StationName;
+                            const stationNameUR = station.StationNameUR;
+                            const city = station.City;
+                            const latitude = station.Latitude;
+                            const longitude = station.Longitude;
+                            
+                            if (stationId && stationName) {
+                                this.stationNames[stationId.toString()] = {
+                                    id: stationId,
+                                    name: stationName.trim(),
+                                    nameUR: stationNameUR ? stationNameUR.trim() : '',
+                                    city: city ? city.trim() : '',
+                                    latitude: latitude,
+                                    longitude: longitude
+                                };
+                            }
+                        } catch (stationError) {
+                            console.log(`❌ Error processing station ${index}:`, stationError);
                         }
                     });
-
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                    }
-
-                    const data = await response.json();
                     
-                    if (data && data.Response && Array.isArray(data.Response)) {
-                        data.Response.forEach(train => {
-                            this.trainNames[train.TrainId.toString()] = {
-                                id: train.TrainId,
-                                number: train.TrainNumber,
-                                name: train.TrainName,
-                                nameUR: train.TrainNameUR,
-                                nameWithNumber: train.TrainNameWithNumber,
-                                description: train.TrainDescription,
-                                isLive: train.IsLive,
-                                isUp: train.IsUp,
-                                imei: train.Imei
+                    const stationCount = Object.keys(this.stationNames).length;
+                    console.log(`✅ STATIONS LOADED: ${stationCount}/${data.Response.length} stations from API`);
+                    document.getElementById('stationCount').textContent = `${stationCount} stations loaded`;
+                    return stationCount > 0;
+                } else {
+                    console.log('❌ Invalid API response structure:', data);
+                    return false;
+                }
+            } catch (error) {
+                console.log('❌ Station API failed:', error.message);
+                document.getElementById('stationCount').textContent = `Station API failed`;
+                return false;
+            }
+        }
+
+        async loadSpecificTrainSchedule(trainId) {
+            try {
+                console.log(`📅 Fetching schedule via proxy for train ${trainId}...`);
+                const response = await fetch(`/api/proxy/Train/GetTrainStationsByTrainId?id=${trainId}`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    console.log(`❌ Schedule API failed for train ${trainId}: HTTP ${response.status} ${response.statusText}`);
+                    return false;
+                }
+
+                const data = await response.json();
+                
+                if (data && data.Response && Array.isArray(data.Response) && data.Response.length > 0) {
+                    this.trainSchedules[trainId] = data.Response.map((station, index) => {
+                        try {
+                            return {
+                                stationDetailsId: station.StationDetailsId,
+                                stationName: station.StationName ? station.StationName.trim() : null,
+                                stationNameUR: station.StationNameUR ? station.StationNameUR.trim() : null,
+                                arrivalTime: station.ArrivalTime,
+                                departureTime: station.DepartureTime,
+                                delayInMinutes: station.DelayInMinutes || 0,
+                                orderNumber: index + 1,
+                                isCrossed: station.IsCrossed || false,
+                                crossedDateTime: station.CrossedDateTime,
+                                latitude: station.Latitude,
+                                longitude: station.Longitude,
+                                city: station.City
                             };
-                        });
-                        
-                        console.log(`✅ Loaded ${data.Response.length} train names`);
-                        return true;
-                    } else {
-                        console.log('⚠️ No train data in response:', data);
-                        return false;
-                    }
-                } catch (error) {
-                    console.log('❌ Failed to load train names:', error.message);
-                    return false;
-                }
-            }
-
-            async loadStationNames() {
-                console.log('🚉 Loading station names from Station/GetStations...');
-                
-                try {
-                    const response = await fetch(`${this.config.apiBase}Station/GetStations`, {
-                        method: 'GET',
-                        headers: {
-                            'Accept': 'application/json',
-                            'Content-Type': 'application/json'
+                        } catch (stationError) {
+                            console.log(`⚠️ Error processing station ${index} in schedule:`, stationError, station);
+                            return null;
+                        }
+                    }).filter(s => s !== null);
+                    
+                    console.log(`✅ SCHEDULE LOADED for train ${trainId}: ${data.Response.length} stations`);
+                    
+                    this.trainSchedules[trainId].forEach(station => {
+                        if (station.stationDetailsId && station.stationName && !this.stationNames[station.stationDetailsId]) {
+                            this.stationNames[station.stationDetailsId.toString()] = {
+                                id: station.stationDetailsId,
+                                name: station.stationName,
+                                nameUR: station.stationNameUR,
+                                city: station.city
+                            };
                         }
                     });
-
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                    }
-
-                    const data = await response.json();
                     
-                    if (data && data.Response && Array.isArray(data.Response)) {
-                        this.stationNames = {};
-                        
-                        data.Response.forEach((station, index) => {
-                            try {
-                                const stationId = station.StationDetailsId;
-                                const stationName = station.StationName;
-                                const stationNameUR = station.StationNameUR;
-                                const city = station.City;
-                                const latitude = station.Latitude;
-                                const longitude = station.Longitude;
-                                
-                                if (stationId && stationName) {
-                                    this.stationNames[stationId.toString()] = {
-                                        id: stationId,
-                                        name: stationName.trim(),
-                                        nameUR: stationNameUR ? stationNameUR.trim() : '',
-                                        city: city ? city.trim() : '',
-                                        latitude: latitude,
-                                        longitude: longitude
-                                    };
-                                }
-                            } catch (stationError) {
-                                console.log(`❌ Error processing station ${index}:`, stationError);
-                            }
-                        });
-                        
-                        const stationCount = Object.keys(this.stationNames).length;
-                        console.log(`✅ STATIONS LOADED: ${stationCount}/${data.Response.length} stations from API`);
-                        document.getElementById('stationCount').textContent = `${stationCount} stations loaded`;
-                        return stationCount > 0;
-                    } else {
-                        console.log('❌ Invalid API response structure:', data);
-                        return false;
-                    }
-                } catch (error) {
-                    console.log('❌ Station API failed:', error.message);
-                    document.getElementById('stationCount').textContent = `Station API failed`;
+                    return true;
+                } else {
+                    console.log(`❌ No schedule data returned for train ${trainId}:`, data);
                     return false;
                 }
+            } catch (error) {
+                console.log(`❌ Schedule API call failed for train ${trainId}:`, error.message);
+                return false;
             }
-
-            async loadSpecificTrainSchedule(trainId) {
-                try {
-                    console.log(`📅 Fetching schedule from API: Train/GetTrainStationsByTrainId?id=${trainId}`);
-                    const response = await fetch(`${this.config.apiBase}Train/GetTrainStationsByTrainId?id=${trainId}`, {
-                        method: 'GET',
-                        headers: {
-                            'Accept': 'application/json',
-                            'Content-Type': 'application/json'
-                        }
-                    });
-
-                    if (!response.ok) {
-                        console.log(`❌ Schedule API failed for train ${trainId}: HTTP ${response.status} ${response.statusText}`);
-                        return false;
-                    }
-
-                    const data = await response.json();
-                    
-                    if (data && data.Response && Array.isArray(data.Response) && data.Response.length > 0) {
-                        this.trainSchedules[trainId] = data.Response.map((station, index) => {
-                            try {
-                                return {
-                                    stationDetailsId: station.StationDetailsId,
-                                    stationName: station.StationName ? station.StationName.trim() : null,
-                                    stationNameUR: station.StationNameUR ? station.StationNameUR.trim() : null,
-                                    arrivalTime: station.ArrivalTime,
-                                    departureTime: station.DepartureTime,
-                                    delayInMinutes: station.DelayInMinutes || 0,
-                                    orderNumber: index + 1,
-                                    isCrossed: station.IsCrossed || false,
-                                    crossedDateTime: station.CrossedDateTime,
-                                    latitude: station.Latitude,
-                                    longitude: station.Longitude,
-                                    city: station.City
-                                };
-                            } catch (stationError) {
-                                console.log(`⚠️ Error processing station ${index} in schedule:`, stationError, station);
-                                return null;
-                            }
-                        }).filter(s => s !== null);
-                        
-                        console.log(`✅ SCHEDULE LOADED for train ${trainId}: ${data.Response.length} stations`);
-                        
-                        this.trainSchedules[trainId].forEach(station => {
-                            if (station.stationDetailsId && station.stationName && !this.stationNames[station.stationDetailsId]) {
-                                this.stationNames[station.stationDetailsId.toString()] = {
-                                    id: station.stationDetailsId,
-                                    name: station.stationName,
-                                    nameUR: station.stationNameUR,
-                                    city: station.city
-                                };
-                            }
-                        });
-                        
-                        return true;
-                    } else {
-                        console.log(`❌ No schedule data returned for train ${trainId}:`, data);
-                        return false;
-                    }
-                } catch (error) {
-                    console.log(`❌ Schedule API call failed for train ${trainId}:`, error.message);
-                    return false;
-                }
-            }
-
+        }
             getStationName(stationId) {
                 if (!stationId || stationId === '-1' || stationId === -1) {
                     return 'Final Destination';
@@ -3222,4 +3206,5 @@ displaySelectedTrain() {
         });
     </script>
 </body>
+
 </html>
