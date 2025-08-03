@@ -1,3 +1,4 @@
+// api/proxy/[...path].js
 export default async function handler(req, res) {
   const { path } = req.query;
   const url = `${process.env.API_BASE_URL}/${path.join('/')}`;
