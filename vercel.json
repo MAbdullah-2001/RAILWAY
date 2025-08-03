@@ -1,12 +1,12 @@
 {
   "rewrites": [
     {
-      "source": "/api/proxy/:path*",
-      "destination": "/api/proxy/[...path].js"
-    },
-    {
       "source": "/api/getConfig",
       "destination": "/api/getConfig.js"
+    },
+    {
+      "source": "/api/proxy/:path*",
+      "destination": "/api/proxy/[...path].js"
     },
     {
       "source": "/(.*)",
