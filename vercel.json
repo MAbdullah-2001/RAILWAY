@@ -1,0 +1,23 @@
+{
+         "version": 2,
+         "builds": [
+             {
+                 "src": "index.html",
+                 "use": "@vercel/static"
+             },
+             {
+                 "src": "api/getConfig.js",
+                 "use": "@vercel/node"
+             }
+         ],
+         "routes": [
+             {
+                 "src": "/api/getConfig",
+                 "dest": "/api/getConfig.js"
+             },
+             {
+                 "src": "/(.*)",
+                 "dest": "/index.html"
+             }
+         ]
+     }
